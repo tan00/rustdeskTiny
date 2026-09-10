@@ -4,6 +4,7 @@ use hbb_common::{config, tokio};
 
 pub const ADDRESS_ENV: &str = "RUSTDESK_TINY_ADDRESS";
 pub const LISTEN_ENV: &str = "RUSTDESK_TINY_LISTEN";
+pub const DIRECT_ONLY_ENV: &str = "RUSTDESK_TINY_DIRECT_ONLY";
 
 const CONNECTION_COMMANDS: &[&str] = &[
     "--connect",
@@ -15,6 +16,7 @@ const CONNECTION_COMMANDS: &[&str] = &[
 ];
 
 pub fn initialize() {
+    std::env::set_var(DIRECT_ONLY_ENV, "1");
     let mut hard = config::HARD_SETTINGS.write().unwrap();
     hard.insert("disable-account".to_owned(), "Y".to_owned());
     hard.insert("disable-ab".to_owned(), "Y".to_owned());

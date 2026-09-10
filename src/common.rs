@@ -635,6 +635,10 @@ impl Drop for CheckTestNatType {
     }
 }
 
+#[cfg(feature = "rustdesk-tiny")]
+pub fn test_nat_type() {}
+
+#[cfg(not(feature = "rustdesk-tiny"))]
 pub fn test_nat_type() {
     test_ipv6_sync();
     use std::sync::atomic::{AtomicBool, Ordering};
@@ -678,6 +682,7 @@ pub fn test_nat_type() {
 }
 
 #[tokio::main(flavor = "current_thread")]
+#[cfg(not(feature = "rustdesk-tiny"))]
 async fn test_nat_type_() -> ResultType<bool> {
     log::info!("Testing nat ...");
     let start = std::time::Instant::now();
@@ -792,6 +797,7 @@ pub async fn get_nat_type(ms_timeout: u64) -> i32 {
 
 // used for client to test which server is faster in case stop-servic=Y
 #[tokio::main(flavor = "current_thread")]
+#[cfg(not(feature = "rustdesk-tiny"))]
 async fn test_rendezvous_server_() {
     let servers = Config::get_rendezvous_servers();
     if servers.len() <= 1 {
@@ -819,6 +825,10 @@ async fn test_rendezvous_server_() {
     Config::reset_online();
 }
 
+#[cfg(feature = "rustdesk-tiny")]
+pub fn test_rendezvous_server() {}
+
+#[cfg(not(feature = "rustdesk-tiny"))]
 pub fn test_rendezvous_server() {
     std::thread::spawn(test_rendezvous_server_);
 }
