@@ -178,6 +178,13 @@ impl RendezvousMediator {
         log::info!("server restart");
     }
 
+    #[cfg(feature = "rustdesk-tiny")]
+    pub async fn start_all() {
+        scrap::codec::test_av1();
+        direct_server_tiny(new_server()).await;
+    }
+
+    #[cfg(not(feature = "rustdesk-tiny"))]
     pub async fn start_all() {
         crate::test_nat_type();
         if config::is_outgoing_only() {
@@ -1128,6 +1135,55 @@ impl RendezvousMediator {
             relay_server = crate::increase_port(&self.host, 1);
         }
         relay_server
+    }
+}
+
+#[cfg(feature = "rustdesk-tiny")]
+async fn direct_server_tiny(server: ServerPtr) {
+    let address = match crate::tiny::listen_address() {
+        Ok(address) => address,
+        Err(error) => {
+            log::error!("{error}");
+            return;
+        }
+    };
+    let listener = match hbb_common::tcp::new_listener(address, false).await {
+        Ok(listener) => listener,
+        Err(error) => {
+            log::error!("Failed to listen on {address}: {error}");
+            return;
+        }
+    };
+    log::info!("RustDeskTiny direct server listening on {address}");
+    loop {
+        match listener.accept().await {
+            Ok((stream, peer)) => {
+                if let Err(error) = stream.set_nodelay(true) {
+                    log::warn!("Failed to set TCP_NODELAY for {peer}: {error}");
+                }
+                let local = match stream.local_addr() {
+                    Ok(local) => local,
+                    Err(error) => {
+                        log::error!("Failed to resolve accepted socket address: {error}");
+                        continue;
+                    }
+                };
+                let server = server.clone();
+                tokio::spawn(async move {
+                    allow_err!(
+                        crate::server::create_tcp_connection(
+                            server,
+                            hbb_common::Stream::from(stream, local),
+                            peer,
+                            false,
+                            ConnectionMeta::default(),
+                        )
+                        .await
+                    );
+                });
+            }
+            Err(error) => log::error!("Direct listener accept failed: {error}"),
+        }
     }
 }
 

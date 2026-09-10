@@ -756,6 +756,21 @@ async fn run_service(_arguments: Vec<OsString>) -> ResultType<()> {
                                     }
                                 }
                             }
+                            #[cfg(feature = "rustdesk-tiny")]
+                            ipc::Data::TinyListen(address) => {
+                                match crate::tiny::parse_address(&address) {
+                                    Ok(address) => {
+                                        std::env::set_var(
+                                            crate::tiny::LISTEN_ENV,
+                                            address.to_string(),
+                                        );
+                                        h_process = launch_server(session_id, true)
+                                            .await
+                                            .unwrap_or(NULL);
+                                    }
+                                    Err(error) => log::warn!("Rejected direct listen address: {error}"),
+                                }
+                            }
                             _ => {}
                         }
                     }
@@ -822,10 +837,15 @@ async fn launch_server(session_id: DWORD, close_first: bool) -> ResultType<HANDL
         // in case started some elsewhere
         send_close_async("").await.ok();
     }
-    let cmd = format!(
-        "\"{}\" --server",
-        std::env::current_exe()?.to_str().unwrap_or("")
-    );
+    let exe = std::env::current_exe()?;
+    let exe = exe.to_str().unwrap_or("");
+    #[cfg(feature = "rustdesk-tiny")]
+    let cmd = match std::env::var(crate::tiny::LISTEN_ENV) {
+        Ok(address) => format!("\"{exe}\" --server --tiny-listen \"{address}\""),
+        Err(_) => format!("\"{exe}\" --server"),
+    };
+    #[cfg(not(feature = "rustdesk-tiny"))]
+    let cmd = format!("\"{exe}\" --server");
     launch_privileged_process(session_id, &cmd)
 }
 

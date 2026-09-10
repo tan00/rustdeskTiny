@@ -49,6 +49,8 @@ mod port_forward_mux;
 
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 mod tray;
+#[cfg(feature = "rustdesk-tiny")]
+pub mod tiny;
 
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 mod whiteboard;

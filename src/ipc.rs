@@ -358,6 +358,8 @@ pub enum Data {
     #[cfg(windows)]
     SAS,
     UserSid(Option<u32>),
+    #[cfg(feature = "rustdesk-tiny")]
+    TinyListen(String),
     OnlineStatus(Option<(i64, bool)>),
     Config((String, Option<String>)),
     Options(Option<HashMap<String, String>>),

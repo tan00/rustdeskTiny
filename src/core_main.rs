@@ -34,6 +34,8 @@ pub fn core_main() -> Option<Vec<String>> {
         return None;
     }
     crate::load_custom_client();
+    #[cfg(feature = "rustdesk-tiny")]
+    crate::tiny::initialize();
     #[cfg(windows)]
     if !crate::platform::windows::bootstrap() {
         // return None to terminate the process
@@ -79,6 +81,48 @@ pub fn core_main() -> Option<Vec<String>> {
             }
         }
         i += 1;
+    }
+    #[cfg(feature = "rustdesk-tiny")]
+    {
+        if let Err(error) = crate::tiny::consume_listen(&mut args) {
+            crate::my_println!("{error}");
+            return None;
+        }
+        match crate::tiny::consume_address(&mut args) {
+            Ok(Some(address)) => {
+                flutter_args.push("--address".to_owned());
+                flutter_args.push(address);
+            }
+            Ok(None) => {}
+            Err(error) => {
+                crate::my_println!("{error}");
+                return None;
+            }
+        }
+        if let Err(error) = crate::tiny::validate_connection_args(&args) {
+            crate::my_println!("{error}");
+            return None;
+        }
+        #[cfg(windows)]
+        if let Some(result) = crate::tiny::handle_service_command(&args) {
+            if let Err(error) = result {
+                crate::my_println!("{error}");
+            }
+            return None;
+        }
+        match crate::tiny::parse_host_args(&args) {
+            Ok(Some(listen)) => {
+                if let Err(error) = crate::tiny::configure_service_host(listen) {
+                    crate::my_println!("{error}");
+                }
+                return None;
+            }
+            Ok(None) => {}
+            Err(error) => {
+                crate::my_println!("{error}");
+                return None;
+            }
+        }
     }
     #[cfg(any(target_os = "linux", target_os = "windows"))]
     if args.is_empty() {
