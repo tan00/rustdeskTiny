@@ -11,3 +11,7 @@ Product changes must remain behind the `rustdesk-tiny` Cargo feature. Upgrade
 by merging the next upstream commit and replaying the small product commits;
 do not copy RustDesk capture, input, session, IPC, or service code into a
 parallel implementation.
+
+Supported desktop targets are Windows, Linux, and macOS. Each target reuses
+the upstream system-service and desktop-session process model; Tiny only adds
+protected direct-listen configuration and the IP-only network policy.

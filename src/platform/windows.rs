@@ -764,7 +764,7 @@ async fn run_service(_arguments: Vec<OsString>) -> ResultType<()> {
                                     Ok(address) => {
                                         let server_active = unsafe {
                                             is_service_child_process_active(h_process)
-                                        };
+                                        } && crate::tiny::listener_is_reachable(address);
                                         if crate::tiny::listener_needs_restart(
                                             tiny_listen_address,
                                             address,

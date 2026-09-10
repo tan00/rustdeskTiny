@@ -595,6 +595,7 @@ pub async fn start(postfix: &str) -> ResultType<()> {
                                 Ok(Some(data)) => {
                                     // On Linux/macOS, the protected `_service` channel is used only for
                                     // syncing config between root service and the active user process.
+                                    // Tiny additionally accepts its validated direct-listen command.
                                     //
                                     // NOTE: `is_service_ipc_postfix()` also includes `_uinput_*`, but those
                                     // channels are handled by the dedicated uinput listener/protocol in
@@ -606,7 +607,10 @@ pub async fn start(postfix: &str) -> ResultType<()> {
                                     // uinput IPC paths while still minimizing exposed message surface here.
                                     #[cfg(any(target_os = "linux", target_os = "macos"))]
                                     if postfix == crate::POSTFIX_SERVICE {
-                                        if matches!(&data, Data::SyncConfig(_)) {
+                                        let allowed = matches!(&data, Data::SyncConfig(_));
+                                        #[cfg(feature = "rustdesk-tiny")]
+                                        let allowed = allowed || matches!(&data, Data::TinyListen(_));
+                                        if allowed {
                                             handle(data, &mut stream).await;
                                         } else {
                                             log::warn!(
@@ -1033,6 +1037,18 @@ async fn handle(data: Data, stream: &mut Connection) {
                     .await
             );
         }
+        #[cfg(all(
+            feature = "rustdesk-tiny",
+            any(target_os = "linux", target_os = "macos")
+        ))]
+        Data::TinyListen(address) => match crate::tiny::parse_address(&address) {
+            Ok(address) => match crate::tiny::configure_unix_service_listener(address) {
+                Ok(true) => crate::platform::restart_tiny_servers(),
+                Ok(false) => log::info!("RustDeskTiny listener already active on {address}"),
+                Err(error) => log::warn!("Failed to configure Tiny listener: {error}"),
+            },
+            Err(error) => log::warn!("Rejected direct listen address: {error}"),
+        },
         #[cfg(windows)]
         Data::SyncWinCpuUsage(None) => {
             allow_err!(

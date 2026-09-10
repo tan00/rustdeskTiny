@@ -152,8 +152,62 @@ fn run_sc(args: &[&str]) -> Result<(), String> {
 
 pub fn listen_address() -> Result<SocketAddr, String> {
     let value = std::env::var(LISTEN_ENV)
+        .or_else(|_| read_service_listen_address())
         .map_err(|_| "RustDeskTiny host listener requires an explicit IP:port".to_owned())?;
     parse_address(&value)
+}
+
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+fn service_listen_path() -> std::path::PathBuf {
+    #[cfg(target_os = "linux")]
+    return "/var/lib/rustdesktiny/direct-listen".into();
+    #[cfg(target_os = "macos")]
+    return "/Library/Application Support/RustDeskTiny/direct-listen".into();
+}
+
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+fn read_service_listen_address() -> Result<String, std::env::VarError> {
+    std::fs::read_to_string(service_listen_path())
+        .map(|value| value.trim().to_owned())
+        .map_err(|_| std::env::VarError::NotPresent)
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
+fn read_service_listen_address() -> Result<String, std::env::VarError> {
+    Err(std::env::VarError::NotPresent)
+}
+
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+pub fn configure_unix_service_listener(address: SocketAddr) -> Result<bool, String> {
+    use std::os::unix::fs::PermissionsExt;
+
+    let path = service_listen_path();
+    let current = std::fs::read_to_string(&path)
+        .ok()
+        .and_then(|value| parse_address(value.trim()).ok());
+    std::env::set_var(LISTEN_ENV, address.to_string());
+    if current == Some(address) && listener_is_reachable(address) {
+        return Ok(false);
+    }
+    let parent = path
+        .parent()
+        .ok_or_else(|| "invalid Tiny service state path".to_owned())?;
+    std::fs::create_dir_all(parent)
+        .map_err(|error| format!("failed to create Tiny service state directory: {error}"))?;
+    std::fs::set_permissions(parent, std::fs::Permissions::from_mode(0o755))
+        .map_err(|error| format!("failed to protect Tiny service state directory: {error}"))?;
+    let temporary = path.with_extension(format!("tmp-{}", std::process::id()));
+    std::fs::write(&temporary, address.to_string())
+        .map_err(|error| format!("failed to write Tiny listen address: {error}"))?;
+    std::fs::set_permissions(&temporary, std::fs::Permissions::from_mode(0o644))
+        .map_err(|error| format!("failed to protect Tiny listen address: {error}"))?;
+    std::fs::rename(&temporary, &path)
+        .map_err(|error| format!("failed to activate Tiny listen address: {error}"))?;
+    Ok(true)
+}
+
+pub fn listener_is_reachable(address: SocketAddr) -> bool {
+    std::net::TcpStream::connect_timeout(&address, std::time::Duration::from_millis(300)).is_ok()
 }
 
 pub fn consume_listen(args: &mut Vec<String>) -> Result<(), String> {
