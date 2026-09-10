@@ -33,8 +33,6 @@ import 'models/platform_model.dart';
 /// Basic window and launch properties.
 int? kWindowId;
 WindowType? kWindowType;
-late List<String> kBootArgs;
-
 Future<void> main(List<String> args) async {
   earlyAssert();
   WidgetsFlutterBinding.ensureInitialized();

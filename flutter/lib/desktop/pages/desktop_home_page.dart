@@ -90,7 +90,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
         child: loadLogo(),
       ),
       buildTip(context),
-      if (!isOutgoingOnly) buildIDBoard(context),
+      if (!isOutgoingOnly && !bind.isCustomClient()) buildIDBoard(context),
       if (!isOutgoingOnly) buildPasswordBoard(context),
       FutureBuilder<Widget>(
         future: Future.value(

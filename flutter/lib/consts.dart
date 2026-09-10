@@ -4,6 +4,8 @@ import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/models/state_model.dart';
 import 'package:get/get.dart';
 
+late List<String> kBootArgs;
+
 const int kMaxVirtualDisplayCount = 4;
 const int kAllVirtualDisplay = -1;
 

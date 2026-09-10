@@ -68,11 +68,13 @@ class DesktopSettingPage extends StatefulWidget {
         !bind.isDisableSettings() &&
         bind.mainGetBuildinOption(key: kOptionHideSecuritySetting) != 'Y')
       SettingsTabKey.safety,
-    if (!bind.isDisableSettings() &&
+    if (!bind.isCustomClient() &&
+        !bind.isDisableSettings() &&
         bind.mainGetBuildinOption(key: kOptionHideNetworkSetting) != 'Y')
       SettingsTabKey.network,
     if (!bind.isIncomingOnly()) SettingsTabKey.display,
-    if (!bind.isDisableAccount()) SettingsTabKey.account,
+    if (!bind.isCustomClient() && !bind.isDisableAccount())
+      SettingsTabKey.account,
     if (isWindows &&
         !bind.isDisableSettings() &&
         bind.mainGetBuildinOption(key: kOptionHideRemotePrinterSetting) != 'Y')
@@ -502,7 +504,7 @@ class _GeneralState extends State<_General> {
       if (!isWeb && !outgoingOnly)
         _OptionCheckBox(context, 'Adaptive bitrate', kOptionEnableAbr),
       if (!isWeb) wallpaper(),
-      if (!isWeb && !incomingOnly) ...[
+      if (!bind.isCustomClient() && !isWeb && !incomingOnly) ...[
         _OptionCheckBox(
           context,
           'Open connection in new tab',
@@ -925,7 +927,7 @@ class _SafetyState extends State<_Safety> with AutomaticKeepAliveClientMixin {
                 permissions(context),
                 password(context),
                 _Card(title: '2FA', children: [tfa()]),
-                if (!isChangeIdDisabled())
+                if (!bind.isCustomClient() && !isChangeIdDisabled())
                   _Card(title: 'ID', children: [changeId()]),
                 more(context),
               ]),

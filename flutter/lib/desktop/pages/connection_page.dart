@@ -221,7 +221,13 @@ class _ConnectionPageState extends State<ConnectionPage>
     super.initState();
     _allPeersLoader.init(setState);
     _idFocusNode.addListener(onFocusChanged);
-    if (_idController.text.isEmpty) {
+    final addressIndex = kBootArgs.indexOf('--address');
+    final presetAddress = addressIndex >= 0 && addressIndex + 1 < kBootArgs.length
+        ? kBootArgs[addressIndex + 1]
+        : null;
+    if (bind.isCustomClient() && presetAddress != null) {
+      _idController.id = presetAddress;
+    } else if (_idController.text.isEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         final lastRemoteId = await bind.mainGetLastRemoteId();
         if (lastRemoteId != _idController.id) {
@@ -333,11 +339,32 @@ class _ConnectionPageState extends State<ConnectionPage>
       bool isTerminal = false,
       bool isTcpTunneling = false}) {
     var id = _idController.id;
+    if (bind.isCustomClient() && !_isValidDirectAddress(id)) {
+      showToast('Invalid IP:port');
+      return;
+    }
     connect(context, id,
         isFileTransfer: isFileTransfer,
         isViewCamera: isViewCamera,
         isTerminal: isTerminal,
         isTcpTunneling: isTcpTunneling);
+  }
+
+  bool _isValidDirectAddress(String value) {
+    final uri = Uri.tryParse('tcp://$value');
+    if (uri == null || !uri.hasPort || uri.port == 0 || uri.host.isEmpty) {
+      return false;
+    }
+    final host = uri.host;
+    final ipv4 = RegExp(r'^(?:\d{1,3}\.){3}\d{1,3}$').hasMatch(host) &&
+        host.split('.').every((part) {
+          final value = int.tryParse(part);
+          return value != null && value >= 0 && value <= 255;
+        });
+    final ipv6 = host.contains(':') &&
+        RegExp(r'^[0-9a-fA-F:]+$').hasMatch(host) &&
+        host != '::';
+    return (ipv4 && host != '0.0.0.0') || ipv6;
   }
 
   /// UI for the remote ID TextField.
@@ -432,7 +459,9 @@ class _ConnectionPageState extends State<ConnectionPage>
                               counterText: '',
                               hintText: _idInputFocused.value
                                   ? null
-                                  : translate('Enter Remote ID'),
+                                  : bind.isCustomClient()
+                                      ? 'IP:port'
+                                      : translate('Enter Remote ID'),
                               contentPadding: const EdgeInsets.symmetric(
                                   horizontal: 15, vertical: 13)),
                           controller: fieldTextEditingController,
