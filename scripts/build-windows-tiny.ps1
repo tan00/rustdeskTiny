@@ -16,18 +16,11 @@ if (-not ($OutputRoot + [IO.Path]::DirectorySeparatorChar).StartsWith(
     throw "OutputRoot must be inside $distRoot"
 }
 
-$toolchainRoot = Join-Path $env:LOCALAPPDATA 'p2premote-desktop-build'
 if ([string]::IsNullOrWhiteSpace($env:VCPKG_ROOT)) {
-    $env:VCPKG_ROOT = Join-Path $toolchainRoot 'vcpkg'
+    throw 'VCPKG_ROOT is not set'
 }
-if ([string]::IsNullOrWhiteSpace($env:LIBCLANG_PATH) -or
-    -not (Test-Path -LiteralPath (Join-Path $env:LIBCLANG_PATH 'libclang.dll'))) {
-    $env:LIBCLANG_PATH = Join-Path $toolchainRoot 'llvm-15.0.6\bin'
-}
-$flutterBin = Join-Path $toolchainRoot 'flutter\bin'
-if (-not (Get-Command flutter -ErrorAction SilentlyContinue) -and
-    (Test-Path -LiteralPath (Join-Path $flutterBin 'flutter.bat'))) {
-    $env:PATH = "$flutterBin;$env:PATH"
+if ([string]::IsNullOrWhiteSpace($env:LIBCLANG_PATH)) {
+    throw 'LIBCLANG_PATH is not set'
 }
 foreach ($required in @(
         (Join-Path $env:VCPKG_ROOT 'vcpkg.exe'),
