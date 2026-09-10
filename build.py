@@ -118,6 +118,8 @@ def make_parser():
              'Available: [Not used for now]. Special value is "ALL" and empty "". Default is empty.')
     parser.add_argument('--flutter', action='store_true',
                         help='Build flutter package', default=False)
+    parser.add_argument('--rustdesk-tiny', action='store_true',
+                        help='Build the IP-direct RustDeskTiny product variant', default=False)
     parser.add_argument(
         '--hwcodec',
         action='store_true',
@@ -314,6 +316,8 @@ def linux_packaging_branch():
 
 def get_features(args):
     features = ['inline'] if not args.flutter else []
+    if args.rustdesk_tiny:
+        features.append('rustdesk-tiny')
     if args.hwcodec:
         features.append('hwcodec')
     if args.vram:
