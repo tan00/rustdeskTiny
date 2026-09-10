@@ -216,6 +216,14 @@ pub fn parse_address(value: &str) -> Result<SocketAddr, String> {
     Ok(address)
 }
 
+pub fn listener_needs_restart(
+    current: Option<SocketAddr>,
+    requested: SocketAddr,
+    server_active: bool,
+) -> bool {
+    current != Some(requested) || !server_active
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -244,5 +252,13 @@ mod tests {
     fn rejects_relay_and_legacy_play() {
         assert!(validate_connection_args(&["--relay".to_owned()]).is_err());
         assert!(validate_connection_args(&["--play".to_owned(), "a".to_owned()]).is_err());
+    }
+
+    #[test]
+    fn listener_configuration_is_idempotent_while_server_is_active() {
+        let address = parse_address("10.10.100.75:39090").unwrap();
+        assert!(!listener_needs_restart(Some(address), address, true));
+        assert!(listener_needs_restart(Some(address), address, false));
+        assert!(listener_needs_restart(None, address, true));
     }
 }
