@@ -4,7 +4,8 @@ import 'package:get/get.dart';
 
 import '../../common.dart';
 
-Widget getConnectionPageTitle(BuildContext context, bool isWeb) {
+Widget getConnectionPageTitle(BuildContext context, bool isWeb,
+    {bool showHelp = true}) {
   return Row(
     children: [
       Expanded(
@@ -18,19 +19,20 @@ Widget getConnectionPageTitle(BuildContext context, bool isWeb) {
                 .titleLarge
                 ?.merge(TextStyle(height: 1)),
           ).marginOnly(right: 4),
-          Tooltip(
-            waitDuration: Duration(milliseconds: 300),
-            message: translate(isWeb ? "web_id_input_tip" : "id_input_tip"),
-            child: Icon(
-              Icons.help_outline_outlined,
-              size: 16,
-              color: Theme.of(context)
-                  .textTheme
-                  .titleLarge
-                  ?.color
-                  ?.withOpacity(0.5),
+          if (showHelp)
+            Tooltip(
+              waitDuration: Duration(milliseconds: 300),
+              message: translate(isWeb ? "web_id_input_tip" : "id_input_tip"),
+              child: Icon(
+                Icons.help_outline_outlined,
+                size: 16,
+                color: Theme.of(context)
+                    .textTheme
+                    .titleLarge
+                    ?.color
+                    ?.withOpacity(0.5),
+              ),
             ),
-          ),
         ],
       )),
     ],

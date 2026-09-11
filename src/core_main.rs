@@ -316,7 +316,14 @@ pub fn core_main() -> Option<Vec<String>> {
                     eprintln!("RustDeskTiny is not installed; silent update was not applied");
                     std::process::exit(2);
                 }
-                let (printer_override, debug, install_dir) = parse_silent_install_args(&args);
+                let (printer_override, debug, install_dir) =
+                    match parse_silent_install_args(&args) {
+                        Ok(parsed) => parsed,
+                        Err(err) => {
+                            eprintln!("Invalid silent installation arguments: {err}");
+                            std::process::exit(1);
+                        }
+                    };
                 let options = platform::get_silent_install_options(printer_override);
                 match platform::install_me(options, install_dir, true, debug) {
                     Ok(_) => std::process::exit(0),
@@ -937,7 +944,7 @@ fn is_cli_setting_change_disabled() -> bool {
 }
 
 #[cfg(windows)]
-fn parse_silent_install_args(args: &[String]) -> (Option<bool>, bool, String) {
+fn parse_silent_install_args(args: &[String]) -> Result<(Option<bool>, bool, String), String> {
     let mut printer_override = None;
     let mut debug = false;
     let mut install_dir = String::new();
@@ -949,15 +956,22 @@ fn parse_silent_install_args(args: &[String]) -> (Option<bool>, bool, String) {
             "printer=0" => printer_override = Some(false),
             "debug" => debug = true,
             "--install-dir" => {
-                if let Some(path) = iter.next() {
-                    install_dir = path.to_owned();
+                if !install_dir.is_empty() {
+                    return Err("--install-dir may only be specified once".to_owned());
                 }
+                let path = iter
+                    .next()
+                    .ok_or_else(|| "--install-dir requires a path".to_owned())?;
+                if path.trim().is_empty() {
+                    return Err("--install-dir requires a non-empty path".to_owned());
+                }
+                install_dir = path.to_owned();
             }
-            _ => {}
+            _ => return Err(format!("unsupported argument: {arg}")),
         }
     }
 
-    (printer_override, debug, install_dir)
+    Ok((printer_override, debug, install_dir))
 }
 
 #[cfg(test)]
@@ -993,6 +1007,35 @@ mod tests {
         ] {
             assert!(!is_user_main_ipc_scope_cli_command(&args(&[command])));
         }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn silent_install_arguments_require_a_valid_install_directory() {
+        let parsed = parse_silent_install_args(&args(&[
+            "--silent-install",
+            "printer=0",
+            "--install-dir",
+            r"C:\Program Files\p2pRemote\resources\RustDeskTiny",
+        ]))
+        .unwrap();
+        assert_eq!(parsed.0, Some(false));
+        assert!(!parsed.1);
+        assert_eq!(
+            parsed.2,
+            r"C:\Program Files\p2pRemote\resources\RustDeskTiny"
+        );
+
+        assert!(parse_silent_install_args(&args(&[
+            "--silent-install",
+            "--install-dir"
+        ]))
+        .is_err());
+        assert!(parse_silent_install_args(&args(&[
+            "--silent-install",
+            "--unknown"
+        ]))
+        .is_err());
     }
 }
 

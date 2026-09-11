@@ -48,7 +48,7 @@ pub fn consume_address(args: &mut Vec<String>) -> Result<Option<String>, String>
             return Err("--address may only be specified once".to_owned());
         }
         if index + 1 >= args.len() {
-            return Err("--address requires an IP:port value".to_owned());
+            return Err("--address requires an ip:port value".to_owned());
         }
         value = Some(parse_address(&args[index + 1])?.to_string());
         args.drain(index..=index + 1);
@@ -71,7 +71,7 @@ pub fn validate_connection_args(args: &[String]) -> Result<(), String> {
         if CONNECTION_COMMANDS.contains(&arg.as_str()) {
             let address = args
                 .get(index + 1)
-                .ok_or_else(|| format!("{arg} requires an IP:port value"))?;
+                .ok_or_else(|| format!("{arg} requires an ip:port value"))?;
             parse_address(address)?;
         }
         if matches!(arg.as_str(), "--relay" | "--play") {
@@ -86,7 +86,7 @@ pub fn parse_host_args(args: &[String]) -> Result<Option<SocketAddr>, String> {
         return Ok(None);
     }
     if args.len() != 3 || args[1] != "--listen" {
-        return Err("usage: RustDeskTiny host --listen <IP:port>".to_owned());
+        return Err("usage: RustDeskTiny host --listen <ip:port>".to_owned());
     }
     parse_address(&args[2]).map(Some)
 }
@@ -155,7 +155,7 @@ fn run_sc(args: &[&str]) -> Result<(), String> {
 pub fn listen_address() -> Result<SocketAddr, String> {
     let value = std::env::var(LISTEN_ENV)
         .or_else(|_| read_service_listen_address())
-        .map_err(|_| "RustDeskTiny host listener requires an explicit IP:port".to_owned())?;
+        .map_err(|_| "RustDeskTiny host listener requires an explicit ip:port".to_owned())?;
     parse_address(&value)
 }
 
@@ -222,7 +222,7 @@ pub fn consume_listen(args: &mut Vec<String>) -> Result<(), String> {
         return Ok(());
     }
     if positions.len() != 1 || positions[0] + 1 >= args.len() {
-        return Err("--tiny-listen requires exactly one IP:port value".to_owned());
+        return Err("--tiny-listen requires exactly one ip:port value".to_owned());
     }
     let index = positions[0];
     let address = parse_address(&args[index + 1])?;
@@ -263,7 +263,7 @@ pub fn parse_address(value: &str) -> Result<SocketAddr, String> {
     let address = value
         .trim()
         .parse::<SocketAddr>()
-        .map_err(|_| format!("invalid IP:port address: {value}"))?;
+        .map_err(|_| format!("invalid ip:port address: {value}"))?;
     if address.ip().is_unspecified() || address.port() == 0 {
         return Err(format!(
             "wildcard and zero-port addresses are not allowed: {value}"

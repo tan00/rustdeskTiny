@@ -90,9 +90,12 @@ Copy-Item -LiteralPath (Join-Path $projectRoot 'LICENCE') -Destination $OutputRo
 $portableDir = Join-Path $projectRoot 'libs\portable'
 Push-Location $portableDir
 try {
-    & $PythonPath -m pip install -r requirements.txt
+    & $PythonPath -c 'import brotli'
     if ($LASTEXITCODE -ne 0) {
-        throw "Portable packer dependencies failed with exit code $LASTEXITCODE"
+        & $PythonPath -m pip install --disable-pip-version-check -r requirements.txt
+        if ($LASTEXITCODE -ne 0) {
+            throw "Portable packer dependencies failed with exit code $LASTEXITCODE"
+        }
     }
     & $PythonPath '.\generate.py' -f $OutputRoot -o . -e $tinyExe
     if ($LASTEXITCODE -ne 0) {

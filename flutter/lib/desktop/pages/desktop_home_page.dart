@@ -59,15 +59,12 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   Widget build(BuildContext context) {
     super.build(context);
     final isIncomingOnly = bind.isIncomingOnly();
-    final isRustDeskTiny =
-        bind.mainGetHardOption(key: 'rustdesk-tiny') == 'Y';
     return _buildBlock(
         child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (!isRustDeskTiny) buildLeftPane(context),
-        if (!isRustDeskTiny && !isIncomingOnly)
-          const VerticalDivider(width: 1),
+        buildLeftPane(context),
+        if (!isIncomingOnly) const VerticalDivider(width: 1),
         if (!isIncomingOnly) Expanded(child: buildRightPane(context)),
       ],
     ));
@@ -92,8 +89,21 @@ class _DesktopHomePageState extends State<DesktopHomePage>
         alignment: Alignment.center,
         child: loadLogo(),
       ),
-      buildTip(context),
-      if (!isOutgoingOnly && !bind.isCustomClient()) buildIDBoard(context),
+      if (isRustDeskTinyMode)
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Text(
+            translate('desk_tip_tiny'),
+            style: TextStyle(
+              fontSize: 12,
+              color: Theme.of(context).textTheme.bodySmall?.color,
+            ),
+          ),
+        )
+      else
+        buildTip(context),
+      if (!isOutgoingOnly && !bind.isCustomClient() && !isRustDeskTinyMode)
+        buildIDBoard(context),
       if (!isOutgoingOnly) buildPasswordBoard(context),
       FutureBuilder<Widget>(
         future: Future.value(

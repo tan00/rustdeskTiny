@@ -62,6 +62,8 @@ final isWebOnWindows = isWebOnWindows_;
 final isWebOnLinux = isWebOnLinux_;
 final isWebOnMacOs = isWebOnMacOS_;
 var isMobile = isAndroid || isIOS;
+final bool isRustDeskTinyMode =
+    bind.mainGetHardOption(key: 'rustdesk-tiny') == 'Y';
 var version = '';
 int androidVersion = 0;
 

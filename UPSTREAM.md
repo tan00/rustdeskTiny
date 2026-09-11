@@ -1,17 +1,100 @@
-# RustDeskTiny upstream
+# RustDeskTiny changes from upstream RustDesk
 
-RustDeskTiny is a GPL-3.0-or-later product branch of RustDesk. The source tree
-and Git history are intentionally kept aligned with upstream.
+This file is the maintenance inventory for RustDeskTiny. Update it whenever a
+Tiny-specific source file is added, removed, or changes responsibility.
+
+## Upstream baseline and policy
 
 - Upstream repository: `https://github.com/rustdesk/rustdesk.git`
 - Upstream baseline: `978e2e28b9d3e12b0d3589604bb6f04f13afdeda`
 - Product branch: `rustdesk-tiny`
+- License: GPL-3.0-or-later, following upstream RustDesk.
+- Comparison command: `git diff 978e2e28b -- <path>`.
 
-Product changes must remain behind the `rustdesk-tiny` Cargo feature. Upgrade
-by merging the next upstream commit and replaying the small product commits;
-do not copy RustDesk capture, input, session, IPC, or service code into a
-parallel implementation.
+Tiny changes should remain behind the `rustdesk-tiny` Cargo feature wherever
+the file is also used by a normal RustDesk build. Keep capture, input, session,
+IPC, privilege and service implementations shared with upstream; do not fork
+those subsystems into copied implementations.
 
-Supported desktop targets are Windows, Linux, and macOS. Each target reuses
-the upstream system-service and desktop-session process model; Tiny only adds
-protected direct-listen configuration and the IP-only network policy.
+## Product behavior
+
+RustDeskTiny accepts only an explicit numeric IPv4 or IPv6 address plus a
+non-zero port. It does not use a RustDesk ID, rendezvous/relay registration,
+NAT probing, server latency probing, account synchronization or RustDesk
+software-update requests. A connection to an explicitly supplied public IP is
+still allowed because it is a user-requested direct connection.
+
+The UI hides the local ID and RustDesk-network state, keeps the one-time
+password, uses an `ip:port` input, removes peer discovery/autocomplete and
+multi-connection help, and hides account/network/server/proxy settings.
+
+## Rust source files changed from upstream
+
+| Source file | RustDeskTiny modification |
+| --- | --- |
+| `Cargo.toml` | Declares the `rustdesk-tiny` Cargo feature. |
+| `src/lib.rs` | Exposes the Tiny product module when the feature is enabled. |
+| `src/tiny.rs` | Central Tiny policy and command implementation: branding/hard settings, strict address parsing, direct-only CLI validation, listener configuration, Windows service commands, Unix listener persistence and associated unit tests. |
+| `src/core_main.rs` | Initializes Tiny before platform bootstrap; consumes Tiny address/listener/host/service commands; implements validated `--silent-install`, `--silent-update` and optional `--install-dir`; returns reliable process exit codes; contains silent-install argument tests. |
+| `src/client.rs` | Rejects every Tiny outgoing target that is not a validated numeric `ip:port` before entering upstream connection negotiation. |
+| `src/rendezvous_mediator.rs` | Replaces the upstream rendezvous loop with a direct TCP listener in Tiny builds and feeds accepted streams into the shared RustDesk server connection implementation. |
+| `src/common.rs` | Compiles NAT tests, rendezvous latency tests and both automatic and direct software-update checks into no-ops for Tiny. |
+| `src/main.rs` | Skips startup rendezvous and NAT tests for Tiny. |
+| `src/flutter_ffi.rs` | Initializes Tiny policy before the Flutter bridge exposes application state. |
+| `src/ipc.rs` | Adds the feature-gated `TinyListen` IPC message, restricts its use to the protected service channel and applies validated listener changes. |
+| `src/platform/windows.rs` | Passes the validated listener to the desktop-session server, restarts only when listener state requires it, supports embedded Tiny service commands, and prevents silent installation from launching GUI/tray processes. |
+| `src/platform/linux.rs` | Restarts the shared session server after a protected Tiny listener change. |
+| `src/platform/macos.rs` | Disables macOS auto-update for Tiny and restarts Tiny session servers after a protected listener change. |
+| `libs/portable/src/main.rs` | Waits for silent install/update completion and propagates the embedded installer's exit code. |
+| `src/lang/cn.rs` | Adds the Tiny-specific Chinese desktop/password explanation. |
+| `src/lang/en.rs` | Adds the English fallback for the Tiny-specific desktop/password explanation. |
+
+`libs/hbb_common` is pinned as an upstream submodule and must remain free of
+uncommitted Tiny-only changes. Direct-target enforcement belongs in
+`src/client.rs` and `src/tiny.rs` in this repository.
+
+## Flutter source files changed from upstream
+
+| Source file | RustDeskTiny modification |
+| --- | --- |
+| `flutter/lib/common.dart` | Caches the process-wide Tiny-mode flag used by the desktop UI. |
+| `flutter/lib/consts.dart` | Owns the boot-argument list so the connection page can consume a preset direct address without importing the app entrypoint. |
+| `flutter/lib/main.dart` | Removes the former duplicate boot-argument declaration. |
+| `flutter/lib/desktop/pages/connection_page.dart` | Uses `ip:port`, validates direct addresses, disables peer loading/online queries/autocomplete, hides RustDesk network status and hides multi-connection help in Tiny mode. |
+| `flutter/lib/common/widgets/connection_page_title.dart` | Adds a caller-controlled `showHelp` flag; normal RustDesk keeps the help tooltip while Tiny removes it. |
+| `flutter/lib/desktop/pages/desktop_home_page.dart` | Hides the local ID, retains the one-time-password panel and displays the Tiny-specific access explanation. |
+| `flutter/lib/desktop/pages/desktop_setting_page.dart` | Hides account/network/ID-oriented settings for the product variant and rotates the one-time password only after an explicit password-length change. |
+| `flutter/lib/models/server_model.dart` | Makes periodic password-model synchronization read-only so polling or transient IPC values cannot rotate the one-time password. |
+| `flutter/lib/models/peer_tab_model.dart` | Disables discovery-oriented peer tabs for the direct-only custom product UI. |
+
+## Build and packaging files changed from upstream
+
+| File | RustDeskTiny modification |
+| --- | --- |
+| `build.py` | Adds `--rustdesk-tiny` and forwards the Cargo feature. |
+| `scripts/build-windows-tiny.ps1` | Produces a renamed Windows application directory and standalone `RustDeskTiny-install.exe`; verifies toolchain inputs and installs the Python Brotli dependency only when absent. |
+| `scripts/build-linux-tiny.sh` | Independent Linux Tiny build entrypoint. |
+| `scripts/build-macos-tiny.sh` | Independent macOS Tiny build entrypoint. |
+
+`flutter/pubspec.lock` may change when Flutter resolves dependencies. Treat it
+as generated dependency state, not as Tiny product logic, and review it
+separately during upstream upgrades.
+
+## Upstream upgrade checklist
+
+1. Fetch and merge the selected upstream RustDesk commit into
+   `rustdesk-tiny`; do not replace the repository with copied source files.
+2. Run `git diff <new-upstream-commit> -- <path>` for every file in the tables
+   above and resolve semantic conflicts, not only textual conflicts.
+3. Confirm `libs/hbb_common` is clean and points at the intended upstream
+   submodule revision.
+4. Build with the `rustdesk-tiny` feature and verify an idle GUI creates no TCP
+   or UDP endpoint.
+5. Verify invalid IDs/domains are rejected, explicit IPv4/IPv6 `ip:port`
+   targets connect directly, and rendezvous/relay/NAT/update paths remain off.
+6. Verify the local ID and network status remain hidden, the one-time password
+   remains stable while focusing/typing, and explicit refresh still rotates it.
+7. Test interactive install, silent install, silent update, custom install
+   directory, service start/stop and upgrade over a previous Tiny version.
+8. Update the baseline hash and this inventory in the same commit as the
+   upstream merge.

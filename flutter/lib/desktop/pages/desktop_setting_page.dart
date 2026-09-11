@@ -1216,6 +1216,7 @@ class _SafetyState extends State<_Safety> with AutomaticKeepAliveClientMixin {
                   if (value != null) {
                     () async {
                       await model.setTemporaryPasswordLength(value.toString());
+                      await bind.mainUpdateTemporaryPassword();
                       await model.updatePasswordModel();
                     }();
                   }

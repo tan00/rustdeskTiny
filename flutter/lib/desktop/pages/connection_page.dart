@@ -297,7 +297,7 @@ class _ConnectionPageState extends State<ConnectionPage>
   void onFocusChanged() {
     _idInputFocused.value = _idFocusNode.hasFocus;
     if (_idFocusNode.hasFocus) {
-      if (_allPeersLoader.needLoad) {
+      if (!isRustDeskTinyMode && _allPeersLoader.needLoad) {
         _allPeersLoader.getAllPeers();
       }
 
@@ -311,7 +311,6 @@ class _ConnectionPageState extends State<ConnectionPage>
   @override
   Widget build(BuildContext context) {
     final isOutgoingOnly = bind.isOutgoingOnly();
-    final isRustDeskTiny = bind.mainGetHardOption(key: 'rustdesk-tiny') == 'Y';
     return Column(
       children: [
         Expanded(
@@ -327,8 +326,8 @@ class _ConnectionPageState extends State<ConnectionPage>
             Expanded(child: PeerTabPage()),
           ],
         ).paddingOnly(left: 12.0)),
-        if (!isOutgoingOnly && !isRustDeskTiny) const Divider(height: 1),
-        if (!isOutgoingOnly && !isRustDeskTiny) OnlineStatusWidget()
+        if (!isOutgoingOnly && !isRustDeskTinyMode) const Divider(height: 1),
+        if (!isOutgoingOnly && !isRustDeskTinyMode) OnlineStatusWidget()
       ],
     );
   }
@@ -341,8 +340,9 @@ class _ConnectionPageState extends State<ConnectionPage>
       bool isTerminal = false,
       bool isTcpTunneling = false}) {
     var id = _idController.id;
-    if (bind.isCustomClient() && !_isValidDirectAddress(id)) {
-      showToast('Invalid IP:port');
+    if ((bind.isCustomClient() || isRustDeskTinyMode) &&
+        !_isValidDirectAddress(id)) {
+      showToast('Invalid ip:port');
       return;
     }
     connect(context, id,
@@ -381,12 +381,18 @@ class _ConnectionPageState extends State<ConnectionPage>
       child: Ink(
         child: Column(
           children: [
-            getConnectionPageTitle(context, false).marginOnly(bottom: 15),
+            getConnectionPageTitle(context, false,
+                    showHelp: !isRustDeskTinyMode)
+                .marginOnly(bottom: 15),
             Row(
               children: [
                 Expanded(
                     child: RawAutocomplete<Peer>(
                   optionsBuilder: (TextEditingValue textEditingValue) {
+                    if (isRustDeskTinyMode) {
+                      _autocompleteOpts = const Iterable<Peer>.empty();
+                      return _autocompleteOpts;
+                    }
                     if (textEditingValue.text == '') {
                       _autocompleteOpts = const Iterable<Peer>.empty();
                     } else if (_allPeersLoader.peers.isEmpty &&
@@ -461,11 +467,8 @@ class _ConnectionPageState extends State<ConnectionPage>
                               counterText: '',
                               hintText: _idInputFocused.value
                                   ? null
-                                  : bind.isCustomClient() ||
-                                          bind.mainGetHardOption(
-                                                  key: 'rustdesk-tiny') ==
-                                              'Y'
-                                      ? 'IP:port'
+                                  : bind.isCustomClient() || isRustDeskTinyMode
+                                      ? 'ip:port'
                                       : translate('Enter Remote ID'),
                               contentPadding: const EdgeInsets.symmetric(
                                   horizontal: 15, vertical: 13)),

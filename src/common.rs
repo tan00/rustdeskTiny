@@ -1019,6 +1019,12 @@ pub fn check_software_update() {
 
 // No need to check `danger_accept_invalid_cert` for now.
 // Because the url is always `https://api.rustdesk.com/version/latest`.
+#[cfg(feature = "rustdesk-tiny")]
+pub fn do_check_software_update() -> hbb_common::ResultType<()> {
+    Ok(())
+}
+
+#[cfg(not(feature = "rustdesk-tiny"))]
 #[tokio::main(flavor = "current_thread")]
 pub async fn do_check_software_update() -> hbb_common::ResultType<()> {
     let (request, url) =
