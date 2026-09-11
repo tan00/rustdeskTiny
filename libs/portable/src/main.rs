@@ -227,8 +227,11 @@ fn is_windows_7() -> bool {
     false
 }
 
-fn execute(path: PathBuf, args: Vec<String>, _ui: bool) {
+fn execute(path: PathBuf, args: Vec<String>, _ui: bool) -> Option<i32> {
     println!("executing {}", path.display());
+    let wait_for_completion = args
+        .iter()
+        .any(|arg| matches!(arg.as_str(), "--silent-install" | "--silent-update"));
     // setup env
     let exe = std::env::current_exe().unwrap_or_default();
     let exe_name = exe.file_name().unwrap_or_default();
@@ -254,19 +257,31 @@ fn execute(path: PathBuf, args: Vec<String>, _ui: bool) {
             .stdout(Stdio::inherit())
             .stderr(Stdio::inherit());
     }
-    let _child = cmd.spawn();
+    let mut child = match cmd.spawn() {
+        Ok(child) => child,
+        Err(error) => {
+            eprintln!("Failed to launch embedded executable: {error}");
+            return wait_for_completion.then_some(1);
+        }
+    };
+
+    if wait_for_completion {
+        return Some(
+            child
+                .wait()
+                .ok()
+                .and_then(|status| status.code())
+                .unwrap_or(1),
+        );
+    }
 
     #[cfg(windows)]
     if _ui {
-        match _child {
-            Ok(child) => unsafe {
-                winapi::um::winuser::AllowSetForegroundWindow(child.id() as u32);
-            },
-            Err(e) => {
-                eprintln!("{:?}", e);
-            }
+        unsafe {
+            winapi::um::winuser::AllowSetForegroundWindow(child.id() as u32);
         }
     }
+    None
 }
 
 fn main() -> Result<(), String> {
@@ -292,7 +307,10 @@ fn main() -> Result<(), String> {
     if let Some(exe) = setup(
         reader,
         None,
-        click_setup || args.contains(&"--silent-install".to_owned()),
+        click_setup
+            || args
+                .iter()
+                .any(|arg| matches!(arg.as_str(), "--silent-install" | "--silent-update")),
         &args,
         &mut ui,
     ) {
@@ -301,7 +319,9 @@ fn main() -> Result<(), String> {
         } else if quick_support {
             args = vec!["--quick_support".to_owned()];
         }
-        execute(exe, args, ui);
+        if let Some(exit_code) = execute(exe, args, ui) {
+            std::process::exit(exit_code);
+        }
     }
     Ok(())
 }

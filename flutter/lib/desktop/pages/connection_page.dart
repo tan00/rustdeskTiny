@@ -222,9 +222,10 @@ class _ConnectionPageState extends State<ConnectionPage>
     _allPeersLoader.init(setState);
     _idFocusNode.addListener(onFocusChanged);
     final addressIndex = kBootArgs.indexOf('--address');
-    final presetAddress = addressIndex >= 0 && addressIndex + 1 < kBootArgs.length
-        ? kBootArgs[addressIndex + 1]
-        : null;
+    final presetAddress =
+        addressIndex >= 0 && addressIndex + 1 < kBootArgs.length
+            ? kBootArgs[addressIndex + 1]
+            : null;
     if (bind.isCustomClient() && presetAddress != null) {
       _idController.id = presetAddress;
     } else if (_idController.text.isEmpty) {
@@ -310,6 +311,7 @@ class _ConnectionPageState extends State<ConnectionPage>
   @override
   Widget build(BuildContext context) {
     final isOutgoingOnly = bind.isOutgoingOnly();
+    final isRustDeskTiny = bind.mainGetHardOption(key: 'rustdesk-tiny') == 'Y';
     return Column(
       children: [
         Expanded(
@@ -325,8 +327,8 @@ class _ConnectionPageState extends State<ConnectionPage>
             Expanded(child: PeerTabPage()),
           ],
         ).paddingOnly(left: 12.0)),
-        if (!isOutgoingOnly) const Divider(height: 1),
-        if (!isOutgoingOnly) OnlineStatusWidget()
+        if (!isOutgoingOnly && !isRustDeskTiny) const Divider(height: 1),
+        if (!isOutgoingOnly && !isRustDeskTiny) OnlineStatusWidget()
       ],
     );
   }
@@ -459,7 +461,10 @@ class _ConnectionPageState extends State<ConnectionPage>
                               counterText: '',
                               hintText: _idInputFocused.value
                                   ? null
-                                  : bind.isCustomClient()
+                                  : bind.isCustomClient() ||
+                                          bind.mainGetHardOption(
+                                                  key: 'rustdesk-tiny') ==
+                                              'Y'
                                       ? 'IP:port'
                                       : translate('Enter Remote ID'),
                               contentPadding: const EdgeInsets.symmetric(

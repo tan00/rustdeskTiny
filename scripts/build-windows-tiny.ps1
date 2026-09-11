@@ -1,6 +1,7 @@
 param(
     [string]$PythonPath = "python",
-    [string]$OutputRoot
+    [string]$OutputRoot,
+    [string]$InstallerOutput
 )
 
 $ErrorActionPreference = 'Stop'
@@ -8,7 +9,11 @@ $projectRoot = Split-Path -Parent $PSScriptRoot
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
     $OutputRoot = Join-Path $projectRoot 'dist\windows-x64-release'
 }
+if ([string]::IsNullOrWhiteSpace($InstallerOutput)) {
+    $InstallerOutput = Join-Path $projectRoot 'dist\RustDeskTiny-install.exe'
+}
 $OutputRoot = [IO.Path]::GetFullPath($OutputRoot)
+$InstallerOutput = [IO.Path]::GetFullPath($InstallerOutput)
 $distRoot = [IO.Path]::GetFullPath((Join-Path $projectRoot 'dist')) + [IO.Path]::DirectorySeparatorChar
 if (-not ($OutputRoot + [IO.Path]::DirectorySeparatorChar).StartsWith(
         $distRoot,
@@ -82,4 +87,29 @@ if ($sourceExe -ne $tinyExe) {
     Move-Item -LiteralPath $sourceExe -Destination $tinyExe -Force
 }
 Copy-Item -LiteralPath (Join-Path $projectRoot 'LICENCE') -Destination $OutputRoot
+$portableDir = Join-Path $projectRoot 'libs\portable'
+Push-Location $portableDir
+try {
+    & $PythonPath -m pip install -r requirements.txt
+    if ($LASTEXITCODE -ne 0) {
+        throw "Portable packer dependencies failed with exit code $LASTEXITCODE"
+    }
+    & $PythonPath '.\generate.py' -f $OutputRoot -o . -e $tinyExe
+    if ($LASTEXITCODE -ne 0) {
+        throw "RustDesk portable packer failed with exit code $LASTEXITCODE"
+    }
+}
+finally {
+    Pop-Location
+}
+$generatedInstaller = Join-Path $projectRoot 'target\release\rustdesk-portable-packer.exe'
+if (-not (Test-Path -LiteralPath $generatedInstaller -PathType Leaf)) {
+    throw "RustDesk portable packer output is missing: $generatedInstaller"
+}
+$installerParent = Split-Path -Parent $InstallerOutput
+if (-not (Test-Path -LiteralPath $installerParent -PathType Container)) {
+    New-Item -ItemType Directory -Path $installerParent -Force | Out-Null
+}
+Copy-Item -LiteralPath $generatedInstaller -Destination $InstallerOutput -Force
 Write-Host "RustDeskTiny output: $OutputRoot"
+Write-Host "RustDeskTiny installer: $InstallerOutput"

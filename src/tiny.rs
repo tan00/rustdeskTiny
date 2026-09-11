@@ -17,7 +17,9 @@ const CONNECTION_COMMANDS: &[&str] = &[
 
 pub fn initialize() {
     std::env::set_var(DIRECT_ONLY_ENV, "1");
+    *config::APP_NAME.write().unwrap() = "RustDeskTiny".to_owned();
     let mut hard = config::HARD_SETTINGS.write().unwrap();
+    hard.insert("rustdesk-tiny".to_owned(), "Y".to_owned());
     hard.insert("disable-account".to_owned(), "Y".to_owned());
     hard.insert("disable-ab".to_owned(), "Y".to_owned());
     hard.insert("disable-group-panel".to_owned(), "Y".to_owned());

@@ -1003,6 +1003,10 @@ pub fn is_modifier(evt: &KeyEvent) -> bool {
     }
 }
 
+#[cfg(feature = "rustdesk-tiny")]
+pub fn check_software_update() {}
+
+#[cfg(not(feature = "rustdesk-tiny"))]
 pub fn check_software_update() {
     if is_custom_client() {
         return;

@@ -59,12 +59,15 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   Widget build(BuildContext context) {
     super.build(context);
     final isIncomingOnly = bind.isIncomingOnly();
+    final isRustDeskTiny =
+        bind.mainGetHardOption(key: 'rustdesk-tiny') == 'Y';
     return _buildBlock(
         child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        buildLeftPane(context),
-        if (!isIncomingOnly) const VerticalDivider(width: 1),
+        if (!isRustDeskTiny) buildLeftPane(context),
+        if (!isRustDeskTiny && !isIncomingOnly)
+          const VerticalDivider(width: 1),
         if (!isIncomingOnly) Expanded(child: buildRightPane(context)),
       ],
     ));

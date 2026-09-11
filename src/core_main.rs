@@ -307,28 +307,24 @@ pub fn core_main() -> Option<Vec<String>> {
                     log::error!("Failed to before-uninstall: {}", err);
                 }
                 return None;
-            } else if args[0] == "--silent-install" {
+            } else if matches!(args[0].as_str(), "--silent-install" | "--silent-update") {
                 if config::is_disable_installation() {
-                    return None;
+                    eprintln!("Installation is disabled by policy");
+                    std::process::exit(1);
                 }
-                let (printer_override, debug) = parse_silent_install_args(&args);
+                if args[0] == "--silent-update" && !platform::is_installed() {
+                    eprintln!("RustDeskTiny is not installed; silent update was not applied");
+                    std::process::exit(2);
+                }
+                let (printer_override, debug, install_dir) = parse_silent_install_args(&args);
                 let options = platform::get_silent_install_options(printer_override);
-                let res = platform::install_me(options, "".to_owned(), true, debug);
-                let text = match res {
-                    Ok(_) => translate("Installation Successful!".to_string()),
+                match platform::install_me(options, install_dir, true, debug) {
+                    Ok(_) => std::process::exit(0),
                     Err(err) => {
-                        println!("Failed with error: {err}");
-                        translate("Installation failed!".to_string())
+                        eprintln!("Silent installation failed: {err}");
+                        std::process::exit(1);
                     }
-                };
-                Toast::new(Toast::POWERSHELL_APP_ID)
-                    .title(&config::APP_NAME.read().unwrap())
-                    .text1(&text)
-                    .sound(Some(Sound::Default))
-                    .duration(Duration::Short)
-                    .show()
-                    .ok();
-                return None;
+                }
             } else if args[0] == "--uninstall-cert" {
                 #[cfg(windows)]
                 hbb_common::allow_err!(crate::platform::windows::uninstall_cert());
@@ -941,20 +937,27 @@ fn is_cli_setting_change_disabled() -> bool {
 }
 
 #[cfg(windows)]
-fn parse_silent_install_args(args: &[String]) -> (Option<bool>, bool) {
+fn parse_silent_install_args(args: &[String]) -> (Option<bool>, bool, String) {
     let mut printer_override = None;
     let mut debug = false;
+    let mut install_dir = String::new();
 
-    for arg in args.iter().skip(1) {
+    let mut iter = args.iter().skip(1);
+    while let Some(arg) = iter.next() {
         match arg.as_str() {
             "printer=1" => printer_override = Some(true),
             "printer=0" => printer_override = Some(false),
             "debug" => debug = true,
+            "--install-dir" => {
+                if let Some(path) = iter.next() {
+                    install_dir = path.to_owned();
+                }
+            }
             _ => {}
         }
     }
 
-    (printer_override, debug)
+    (printer_override, debug, install_dir)
 }
 
 #[cfg(test)]
