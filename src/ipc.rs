@@ -975,6 +975,9 @@ async fn handle(data: Data, stream: &mut Connection) {
                         Config::set_id(&value);
                     }
                 } else if name == "temporary-password" {
+                    #[cfg(feature = "rustdesk-tiny")]
+                    crate::tiny::update_temporary_password();
+                    #[cfg(not(feature = "rustdesk-tiny"))]
                     password::update_temporary_password();
                 } else if name == "permanent-password" {
                     if Config::is_disable_change_permanent_password() {

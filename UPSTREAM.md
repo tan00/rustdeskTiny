@@ -34,14 +34,15 @@ multi-connection help, and hides account/network/server/proxy settings.
 | --- | --- |
 | `Cargo.toml` | Declares the `rustdesk-tiny` Cargo feature. |
 | `src/lib.rs` | Exposes the Tiny product module when the feature is enabled. |
-| `src/tiny.rs` | Central Tiny policy and command implementation: branding/hard settings, strict address parsing, direct-only CLI validation, listener configuration, Windows service commands, Unix listener persistence and associated unit tests. |
+| `src/tiny.rs` | Central Tiny policy and command implementation: branding/hard settings, stable persisted one-time password, permanently enabled direct IP access with an editable port, strict address parsing, direct-only CLI validation, listener configuration, Windows service commands, Unix listener persistence and associated unit tests. |
 | `src/core_main.rs` | Initializes Tiny before platform bootstrap; consumes Tiny address/listener/host/service commands; implements validated `--silent-install`, `--silent-update` and optional `--install-dir`; returns reliable process exit codes; contains silent-install argument tests. |
 | `src/client.rs` | Rejects every Tiny outgoing target that is not a validated numeric `ip:port` before entering upstream connection negotiation. |
-| `src/rendezvous_mediator.rs` | Replaces the upstream rendezvous loop with a direct TCP listener in Tiny builds and feeds accepted streams into the shared RustDesk server connection implementation. |
+| `src/rendezvous_mediator.rs` | Replaces the upstream rendezvous loop with a `0.0.0.0` direct TCP listener on the configured port in Tiny builds and feeds accepted streams into the shared RustDesk server connection implementation. |
+| `src/server/connection.rs` | Keeps the Tiny one-time password stable across completed sessions and failed authentication attempts; normal builds retain upstream automatic rotation. |
 | `src/common.rs` | Compiles NAT tests, rendezvous latency tests and both automatic and direct software-update checks into no-ops for Tiny. |
 | `src/main.rs` | Skips startup rendezvous and NAT tests for Tiny. |
 | `src/flutter_ffi.rs` | Initializes Tiny policy before the Flutter bridge exposes application state. |
-| `src/ipc.rs` | Adds the feature-gated `TinyListen` IPC message, restricts its use to the protected service channel and applies validated listener changes. |
+| `src/ipc.rs` | Adds the feature-gated `TinyListen` IPC message, restricts its use to the protected service channel, applies validated listener changes and routes explicit Tiny password refreshes through persistent Tiny state. |
 | `src/platform/windows.rs` | Passes the validated listener to the desktop-session server, restarts only when listener state requires it, supports embedded Tiny service commands, and prevents silent installation from launching GUI/tray processes. |
 | `src/platform/linux.rs` | Restarts the shared session server after a protected Tiny listener change. |
 | `src/platform/macos.rs` | Disables macOS auto-update for Tiny and restarts Tiny session servers after a protected listener change. |

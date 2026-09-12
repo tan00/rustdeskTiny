@@ -1140,13 +1140,8 @@ impl RendezvousMediator {
 
 #[cfg(feature = "rustdesk-tiny")]
 async fn direct_server_tiny(server: ServerPtr) {
-    let address = match crate::tiny::listen_address() {
-        Ok(address) => address,
-        Err(error) => {
-            log::error!("{error}");
-            return;
-        }
-    };
+    let port = get_direct_port();
+    let address = SocketAddr::from(([0, 0, 0, 0], port as u16));
     let listener = match hbb_common::tcp::new_listener(address, false).await {
         Ok(listener) => listener,
         Err(error) => {

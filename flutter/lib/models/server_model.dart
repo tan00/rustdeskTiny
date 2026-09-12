@@ -244,7 +244,9 @@ class ServerModel with ChangeNotifier {
       _approveMode = approveMode;
       update = true;
     }
-    var stopped = await mainGetBoolOption(kOptionStopService);
+    final stopped = isRustDeskTinyMode
+        ? false
+        : await mainGetBoolOption(kOptionStopService);
     final oldPwdText = _serverPasswd.text;
     if (stopped ||
         verificationMethod == kUsePermanentPassword ||

@@ -1123,6 +1123,7 @@ impl Connection {
             }
         }
         video_service::notify_video_frame_fetched_by_conn_id(id, None);
+        #[cfg(not(feature = "rustdesk-tiny"))]
         if conn.authorized {
             password::update_temporary_password();
         }
@@ -2403,6 +2404,9 @@ impl Connection {
     // match clears this state immediately, and the counter also resets whenever the
     // temporary password changes or is rotated.
     fn check_update_temporary_password(&self, temporary_password_success: bool) {
+        if cfg!(feature = "rustdesk-tiny") {
+            return;
+        }
         const MAX_CONSECUTIVE_FAILURES: i32 = 10;
         #[derive(Default)]
         struct State {

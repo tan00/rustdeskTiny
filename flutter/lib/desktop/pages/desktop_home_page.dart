@@ -104,7 +104,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
         buildTip(context),
       if (!isOutgoingOnly && !bind.isCustomClient() && !isRustDeskTinyMode)
         buildIDBoard(context),
-      if (!isOutgoingOnly) buildPasswordBoard(context),
+      if (!isOutgoingOnly || isRustDeskTinyMode) buildPasswordBoard(context),
       FutureBuilder<Widget>(
         future: Future.value(
             Obx(() => buildHelpCards(stateGlobal.updateUrl.value))),
