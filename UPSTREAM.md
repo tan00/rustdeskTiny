@@ -9,7 +9,10 @@ Tiny-specific source file is added, removed, or changes responsibility.
 - Upstream baseline: `978e2e28b9d3e12b0d3589604bb6f04f13afdeda`
 - Product branch: `rustdesk-tiny`
 - License: GPL-3.0-or-later, following upstream RustDesk.
-- Comparison command: `git diff 978e2e28b -- <path>`.
+- Full inventory command: `git diff --name-status 978e2e28b..HEAD`.
+- Per-file comparison command: `git diff 978e2e28b..HEAD -- <path>`.
+- `libs/hbb_common` baseline revision: `29cf7cbe4d38ce36020749f713fb066299f02431`.
+- `libs/hbb_common` Tiny revision: `37f609194804ca01fbe6ac237e70a9e4d07730a3`.
 
 Tiny changes should remain behind the `rustdesk-tiny` Cargo feature wherever
 the file is also used by a normal RustDesk build. Keep capture, input, session,
@@ -27,6 +30,20 @@ still allowed because it is a user-requested direct connection.
 The UI hides the local ID and RustDesk-network state, keeps the one-time
 password, uses an `ip:port` input, removes peer discovery/autocomplete and
 multi-connection help, and hides account/network/server/proxy settings.
+
+## Functional change map
+
+| Changed behavior compared with upstream RustDesk | Implementing source files |
+| --- | --- |
+| Product identity and feature activation | `Cargo.toml`, `src/lib.rs`, `src/tiny.rs`, `src/core_main.rs`, `src/flutter_ffi.rs` |
+| Numeric `ip:port`-only outgoing connections | `src/tiny.rs`, `src/client.rs`, `flutter/lib/consts.dart`, `flutter/lib/main.dart`, `flutter/lib/desktop/pages/connection_page.dart`, `flutter/lib/common/widgets/connection_page_title.dart` |
+| No rendezvous, relay registration, NAT/latency probing, account synchronization or update traffic | `src/rendezvous_mediator.rs`, `src/common.rs`, `src/main.rs`, `src/platform/macos.rs`, `flutter/lib/models/peer_tab_model.dart`, `flutter/lib/desktop/pages/connection_page.dart`, `flutter/lib/desktop/pages/desktop_setting_page.dart` |
+| Always-on direct server bound to `0.0.0.0:<configured-port>` | `src/tiny.rs`, `src/rendezvous_mediator.rs`, `src/ipc.rs`, `src/platform/windows.rs`, `src/platform/linux.rs`, `src/platform/macos.rs` |
+| Stable one-time password, changed only by explicit refresh or password-length change | `src/tiny.rs`, `src/ipc.rs`, `src/server/connection.rs`, `flutter/lib/models/server_model.dart`, `flutter/lib/desktop/pages/desktop_setting_page.dart` |
+| Tiny home page: no local ID/network status, but one-time password remains visible | `flutter/lib/common.dart`, `flutter/lib/desktop/pages/desktop_home_page.dart`, `flutter/lib/models/server_model.dart`, `src/lang/cn.rs`, `src/lang/en.rs` |
+| Removes ID discovery, remote lookup, autocomplete, account and server-oriented UI | `flutter/lib/desktop/pages/connection_page.dart`, `flutter/lib/common/widgets/connection_page_title.dart`, `flutter/lib/desktop/pages/desktop_setting_page.dart`, `flutter/lib/models/peer_tab_model.dart` |
+| Standalone install/service lifecycle and silent install/update | `src/tiny.rs`, `src/core_main.rs`, `src/platform/windows.rs`, `libs/portable/src/main.rs`, `scripts/build-windows-tiny.ps1` |
+| Independent Linux and macOS packaging | `scripts/build-linux-tiny.sh`, `scripts/build-macos-tiny.sh` |
 
 ## Rust source files changed from upstream
 
@@ -49,6 +66,7 @@ multi-connection help, and hides account/network/server/proxy settings.
 | `libs/portable/src/main.rs` | Waits for silent install/update completion and propagates the embedded installer's exit code. |
 | `src/lang/cn.rs` | Adds the Tiny-specific Chinese desktop/password explanation. |
 | `src/lang/en.rs` | Adds the English fallback for the Tiny-specific desktop/password explanation. |
+| `libs/hbb_common` | Advances the upstream submodule pointer from `29cf7cbe4` to `37f609194`; Tiny does not carry local modifications inside the submodule. |
 
 `libs/hbb_common` is pinned as an upstream submodule and must remain free of
 uncommitted Tiny-only changes. Direct-target enforcement belongs in
@@ -89,8 +107,10 @@ separately during upstream upgrades.
    above and resolve semantic conflicts, not only textual conflicts.
 3. Confirm `libs/hbb_common` is clean and points at the intended upstream
    submodule revision.
-4. Build with the `rustdesk-tiny` feature and verify an idle GUI creates no TCP
-   or UDP endpoint.
+4. Build with the `rustdesk-tiny` feature and verify the service listens only on
+   the configured direct-access TCP port (`0.0.0.0:<port>`), with no outbound
+   rendezvous, relay, NAT, latency, account or update connection and no
+   unrelated UDP endpoint.
 5. Verify invalid IDs/domains are rejected, explicit IPv4/IPv6 `ip:port`
    targets connect directly, and rendezvous/relay/NAT/update paths remain off.
 6. Verify the local ID and network status remain hidden, the one-time password
