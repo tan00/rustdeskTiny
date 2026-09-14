@@ -8,11 +8,14 @@ Tiny-specific source file is added, removed, or changes responsibility.
 - Upstream repository: `https://github.com/rustdesk/rustdesk.git`
 - Upstream baseline: `978e2e28b9d3e12b0d3589604bb6f04f13afdeda`
 - Product branch: `rustdesk-tiny`
-- License: GPL-3.0-or-later, following upstream RustDesk.
+- License: AGPL-3.0, following upstream RustDesk (`LICENCE` file).
 - Full inventory command: `git diff --name-status 978e2e28b..HEAD`.
 - Per-file comparison command: `git diff 978e2e28b..HEAD -- <path>`.
 - `libs/hbb_common` baseline revision: `29cf7cbe4d38ce36020749f713fb066299f02431`.
 - `libs/hbb_common` Tiny revision: `37f609194804ca01fbe6ac237e70a9e4d07730a3`.
+- `libs/hbb_common` is consumed from the Tiny fork
+  `https://github.com/tan00/hbb_common` (single Tiny commit on top of the
+  baseline above); the upstream remote is `https://github.com/rustdesk/hbb_common`.
 
 Tiny changes should remain behind the `rustdesk-tiny` Cargo feature wherever
 the file is also used by a normal RustDesk build. Keep capture, input, session,
