@@ -1065,11 +1065,6 @@ fn force_stop_server() {
     sleep_millis(super::SERVICE_INTERVAL);
 }
 
-#[cfg(feature = "rustdesk-tiny")]
-pub fn restart_tiny_servers() {
-    force_stop_server();
-}
-
 pub fn start_os_service() {
     check_if_stop_service();
     stop_rustdesk_servers();

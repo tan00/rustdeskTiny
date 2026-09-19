@@ -700,8 +700,6 @@ async fn run_service(_arguments: Vec<OsString>) -> ResultType<()> {
     let mut session_id = unsafe { get_current_session(share_rdp()) };
     log::info!("session id {}", session_id);
     let mut h_process = launch_server(session_id, true).await.unwrap_or(NULL);
-    #[cfg(feature = "rustdesk-tiny")]
-    let mut tiny_listen_address = None;
     let mut incoming = ipc::new_listener(crate::POSTFIX_SERVICE).await?;
     let mut stored_usid = None;
     loop {
@@ -756,35 +754,6 @@ async fn run_service(_arguments: Vec<OsString>) -> ResultType<()> {
                                         h_process =
                                             launch_server(session_id, true).await.unwrap_or(NULL);
                                     }
-                                }
-                            }
-                            #[cfg(feature = "rustdesk-tiny")]
-                            ipc::Data::TinyListen(address) => {
-                                match crate::tiny::parse_address(&address) {
-                                    Ok(address) => {
-                                        let server_active = unsafe {
-                                            is_service_child_process_active(h_process)
-                                        } && crate::tiny::listener_is_reachable(address);
-                                        if crate::tiny::listener_needs_restart(
-                                            tiny_listen_address,
-                                            address,
-                                            server_active,
-                                        ) {
-                                            std::env::set_var(
-                                                crate::tiny::LISTEN_ENV,
-                                                address.to_string(),
-                                            );
-                                            h_process = launch_server(session_id, true)
-                                                .await
-                                                .unwrap_or(NULL);
-                                            tiny_listen_address = Some(address);
-                                        } else {
-                                            log::info!(
-                                                "RustDeskTiny listener already active on {address}"
-                                            );
-                                        }
-                                    }
-                                    Err(error) => log::warn!("Rejected direct listen address: {error}"),
                                 }
                             }
                             _ => {}
@@ -848,15 +817,6 @@ async fn run_service(_arguments: Vec<OsString>) -> ResultType<()> {
     Ok(())
 }
 
-#[cfg(feature = "rustdesk-tiny")]
-unsafe fn is_service_child_process_active(process: HANDLE) -> bool {
-    if process.is_null() {
-        return false;
-    }
-    let mut exit_code: DWORD = 0;
-    GetExitCodeProcess(process, &mut exit_code) == TRUE && exit_code == STILL_ACTIVE
-}
-
 async fn launch_server(session_id: DWORD, close_first: bool) -> ResultType<HANDLE> {
     if close_first {
         // in case started some elsewhere
@@ -864,12 +824,6 @@ async fn launch_server(session_id: DWORD, close_first: bool) -> ResultType<HANDL
     }
     let exe = std::env::current_exe()?;
     let exe = exe.to_str().unwrap_or("");
-    #[cfg(feature = "rustdesk-tiny")]
-    let cmd = match std::env::var(crate::tiny::LISTEN_ENV) {
-        Ok(address) => format!("\"{exe}\" --server --tiny-listen \"{address}\""),
-        Err(_) => format!("\"{exe}\" --server"),
-    };
-    #[cfg(not(feature = "rustdesk-tiny"))]
     let cmd = format!("\"{exe}\" --server");
     launch_privileged_process(session_id, &cmd)
 }

@@ -1,9 +1,8 @@
 use std::net::SocketAddr;
 
-use hbb_common::{config, password_security, tokio};
+use hbb_common::{config, password_security};
 
 pub const ADDRESS_ENV: &str = "RUSTDESK_TINY_ADDRESS";
-pub const LISTEN_ENV: &str = "RUSTDESK_TINY_LISTEN";
 pub const DIRECT_ONLY_ENV: &str = "RUSTDESK_TINY_DIRECT_ONLY";
 const TEMPORARY_PASSWORD_OPTION: &str = "tiny-temporary-password";
 
@@ -108,16 +107,6 @@ pub fn validate_connection_args(args: &[String]) -> Result<(), String> {
     Ok(())
 }
 
-pub fn parse_host_args(args: &[String]) -> Result<Option<SocketAddr>, String> {
-    if args.first().map(String::as_str) != Some("host") {
-        return Ok(None);
-    }
-    if args.len() != 3 || args[1] != "--listen" {
-        return Err("usage: RustDeskTiny host --listen <ip:port>".to_owned());
-    }
-    parse_address(&args[2]).map(Some)
-}
-
 #[cfg(windows)]
 pub fn handle_service_command(args: &[String]) -> Option<Result<(), String>> {
     let command = args.first().map(String::as_str)?;
@@ -179,113 +168,6 @@ fn run_sc(args: &[&str]) -> Result<(), String> {
     }
 }
 
-pub fn listen_address() -> Result<SocketAddr, String> {
-    let value = std::env::var(LISTEN_ENV)
-        .or_else(|_| read_service_listen_address())
-        .map_err(|_| "RustDeskTiny host listener requires an explicit ip:port".to_owned())?;
-    parse_address(&value)
-}
-
-#[cfg(any(target_os = "linux", target_os = "macos"))]
-fn service_listen_path() -> std::path::PathBuf {
-    #[cfg(target_os = "linux")]
-    return "/var/lib/rustdesktiny/direct-listen".into();
-    #[cfg(target_os = "macos")]
-    return "/Library/Application Support/RustDeskTiny/direct-listen".into();
-}
-
-#[cfg(any(target_os = "linux", target_os = "macos"))]
-fn read_service_listen_address() -> Result<String, std::env::VarError> {
-    std::fs::read_to_string(service_listen_path())
-        .map(|value| value.trim().to_owned())
-        .map_err(|_| std::env::VarError::NotPresent)
-}
-
-#[cfg(not(any(target_os = "linux", target_os = "macos")))]
-fn read_service_listen_address() -> Result<String, std::env::VarError> {
-    Err(std::env::VarError::NotPresent)
-}
-
-#[cfg(any(target_os = "linux", target_os = "macos"))]
-pub fn configure_unix_service_listener(address: SocketAddr) -> Result<bool, String> {
-    use std::os::unix::fs::PermissionsExt;
-
-    let path = service_listen_path();
-    let current = std::fs::read_to_string(&path)
-        .ok()
-        .and_then(|value| parse_address(value.trim()).ok());
-    std::env::set_var(LISTEN_ENV, address.to_string());
-    if current == Some(address) && listener_is_reachable(address) {
-        return Ok(false);
-    }
-    let parent = path
-        .parent()
-        .ok_or_else(|| "invalid Tiny service state path".to_owned())?;
-    std::fs::create_dir_all(parent)
-        .map_err(|error| format!("failed to create Tiny service state directory: {error}"))?;
-    std::fs::set_permissions(parent, std::fs::Permissions::from_mode(0o755))
-        .map_err(|error| format!("failed to protect Tiny service state directory: {error}"))?;
-    let temporary = path.with_extension(format!("tmp-{}", std::process::id()));
-    std::fs::write(&temporary, address.to_string())
-        .map_err(|error| format!("failed to write Tiny listen address: {error}"))?;
-    std::fs::set_permissions(&temporary, std::fs::Permissions::from_mode(0o644))
-        .map_err(|error| format!("failed to protect Tiny listen address: {error}"))?;
-    std::fs::rename(&temporary, &path)
-        .map_err(|error| format!("failed to activate Tiny listen address: {error}"))?;
-    Ok(true)
-}
-
-pub fn listener_is_reachable(address: SocketAddr) -> bool {
-    std::net::TcpStream::connect_timeout(&address, std::time::Duration::from_millis(300)).is_ok()
-}
-
-pub fn consume_listen(args: &mut Vec<String>) -> Result<(), String> {
-    let positions: Vec<_> = args
-        .iter()
-        .enumerate()
-        .filter_map(|(index, value)| (value == "--tiny-listen").then_some(index))
-        .collect();
-    if positions.is_empty() {
-        return Ok(());
-    }
-    if positions.len() != 1 || positions[0] + 1 >= args.len() {
-        return Err("--tiny-listen requires exactly one ip:port value".to_owned());
-    }
-    let index = positions[0];
-    let address = parse_address(&args[index + 1])?;
-    std::env::set_var(LISTEN_ENV, address.to_string());
-    args.drain(index..=index + 1);
-    Ok(())
-}
-
-#[hbb_common::tokio::main(flavor = "current_thread")]
-pub async fn configure_service_host(address: SocketAddr) -> Result<(), String> {
-    let mut stream = crate::ipc::connect_service(3000)
-        .await
-        .map_err(|error| format!("RustDesk service is unavailable: {error}"))?;
-    stream
-        .send(&crate::ipc::Data::TinyListen(address.to_string()))
-        .await
-        .map_err(|error| format!("failed to configure RustDesk service: {error}"))?;
-
-    let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(15);
-    while tokio::time::Instant::now() < deadline {
-        if tokio::time::timeout(
-            std::time::Duration::from_millis(500),
-            tokio::net::TcpStream::connect(address),
-        )
-        .await
-        .is_ok_and(|result| result.is_ok())
-        {
-            return Ok(());
-        }
-        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-    }
-    Err(format!(
-        "RustDeskTiny service did not listen on {address} within 15 seconds"
-    ))
-}
-
 pub fn parse_address(value: &str) -> Result<SocketAddr, String> {
     let address = value
         .trim()
@@ -297,14 +179,6 @@ pub fn parse_address(value: &str) -> Result<SocketAddr, String> {
         ));
     }
     Ok(address)
-}
-
-pub fn listener_needs_restart(
-    current: Option<SocketAddr>,
-    requested: SocketAddr,
-    server_active: bool,
-) -> bool {
-    current != Some(requested) || !server_active
 }
 
 #[cfg(test)]
@@ -335,13 +209,5 @@ mod tests {
     fn rejects_relay_and_legacy_play() {
         assert!(validate_connection_args(&["--relay".to_owned()]).is_err());
         assert!(validate_connection_args(&["--play".to_owned(), "a".to_owned()]).is_err());
-    }
-
-    #[test]
-    fn listener_configuration_is_idempotent_while_server_is_active() {
-        let address = parse_address("10.10.100.75:39090").unwrap();
-        assert!(!listener_needs_restart(Some(address), address, true));
-        assert!(listener_needs_restart(Some(address), address, false));
-        assert!(listener_needs_restart(None, address, true));
     }
 }

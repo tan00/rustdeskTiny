@@ -84,10 +84,6 @@ pub fn core_main() -> Option<Vec<String>> {
     }
     #[cfg(feature = "rustdesk-tiny")]
     {
-        if let Err(error) = crate::tiny::consume_listen(&mut args) {
-            crate::my_println!("{error}");
-            return None;
-        }
         match crate::tiny::consume_address(&mut args) {
             Ok(Some(address)) => {
                 flutter_args.push("--address".to_owned());
@@ -109,19 +105,6 @@ pub fn core_main() -> Option<Vec<String>> {
                 crate::my_println!("{error}");
             }
             return None;
-        }
-        match crate::tiny::parse_host_args(&args) {
-            Ok(Some(listen)) => {
-                if let Err(error) = crate::tiny::configure_service_host(listen) {
-                    crate::my_println!("{error}");
-                }
-                return None;
-            }
-            Ok(None) => {}
-            Err(error) => {
-                crate::my_println!("{error}");
-                return None;
-            }
         }
     }
     #[cfg(any(target_os = "linux", target_os = "windows"))]

@@ -902,20 +902,6 @@ pub fn start_os_service() {
     */
 }
 
-#[cfg(feature = "rustdesk-tiny")]
-pub fn restart_tiny_servers() {
-    let app_name = crate::get_app_name();
-    let pattern = format!("/Applications/{0}.app/Contents/MacOS/{0} --server", app_name);
-    match std::process::Command::new("pkill")
-        .args(["-f", &pattern])
-        .status()
-    {
-        Ok(status) if status.success() || status.code() == Some(1) => {}
-        Ok(status) => log::warn!("Failed to restart RustDeskTiny session servers: {status}"),
-        Err(error) => log::warn!("Failed to run pkill for RustDeskTiny servers: {error}"),
-    }
-}
-
 pub fn toggle_blank_screen(_v: bool) {
     // https://unix.stackexchange.com/questions/17115/disable-keyboard-mouse-temporarily
 }
