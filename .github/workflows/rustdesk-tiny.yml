@@ -1,0 +1,303 @@
+name: Build RustDeskTiny
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+    paths:
+      - ".github/patches/**"
+      - ".github/workflows/rustdesk-tiny.yml"
+      - ".gitmodules"
+      - "flutter/**"
+      - "libs/**"
+      - "res/**"
+      - "scripts/build-*-tiny.*"
+      - "src/**"
+      - "build.py"
+      - "build.rs"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "vcpkg.json"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rustdesk-tiny-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_VERSION: "3.24.5"
+  FLUTTER_RUST_BRIDGE_VERSION: "1.80.1"
+  LLVM_VERSION: "15.0.6"
+  RUST_VERSION: "1.75"
+  MAC_RUST_VERSION: "1.81"
+  VCPKG_COMMIT_ID: "9e593bb18ea69cc5095e012465dcd675a822ed0d"
+  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+
+jobs:
+  windows:
+    name: Windows x86_64
+    runs-on: windows-2022
+    steps:
+      - name: Export GitHub Actions cache environment variables
+        uses: actions/github-script@d7906e4ad0b1822421a7e6a35d5ca353c962f410 # v6
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+      - name: Checkout source code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          submodules: recursive
+
+      - name: Install LLVM and Clang
+        uses: KyleMayes/install-llvm-action@ebc0426251bc40c7cd31162802432c68818ab8f0 # v2.0.9
+        with:
+          version: ${{ env.LLVM_VERSION }}
+
+      - name: Export libclang path
+        shell: pwsh
+        run: |
+          "LIBCLANG_PATH=$env:LLVM_PATH\bin" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@2783a3f08e1baf891508463f8c6653c258246225 # v2.12.0
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          architecture: x64
+
+      - name: Replace engine with RustDesk custom Flutter engine
+        shell: pwsh
+        run: |
+          flutter precache --windows
+          Invoke-WebRequest -Uri https://github.com/rustdesk/engine/releases/download/main/windows-x64-release.zip -OutFile windows-x64-release.zip
+          Expand-Archive -Path windows-x64-release.zip -DestinationPath windows-x64-release
+          Move-Item -Force windows-x64-release/* "C:/hostedtoolcache/windows/flutter/stable-${{ env.FLUTTER_VERSION }}-x64/bin/cache/artifacts/engine/windows-x64-release/"
+
+      - name: Patch Flutter
+        shell: bash
+        run: |
+          flutter_root=$(dirname "$(dirname "$(which flutter)")")
+          git -C "$flutter_root" apply "$GITHUB_WORKSPACE/.github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff"
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          prefix-key: windows-x86_64-tiny
+
+      - name: Install Flutter Rust bridge code generator
+        shell: bash
+        run: cargo install flutter_rust_bridge_codegen --version "$FLUTTER_RUST_BRIDGE_VERSION" --features uuid --locked
+
+      - name: Setup vcpkg with GitHub Actions binary cache
+        uses: lukka/run-vcpkg@b1a0dd252f06b9e25b3c022a9a03bd7a427fb6a2 # v11
+        with:
+          vcpkgDirectory: C:\vcpkg
+          vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
+          doNotCache: false
+
+      - name: Install vcpkg dependencies
+        shell: bash
+        env:
+          VCPKG_DEFAULT_HOST_TRIPLET: x64-windows-static
+        run: |
+          "$VCPKG_ROOT/vcpkg" install --triplet x64-windows-static --x-install-root="$VCPKG_ROOT/installed"
+
+      - name: Build RustDeskTiny
+        shell: pwsh
+        run: ./scripts/build-windows-tiny.ps1
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: RustDeskTiny-windows-x86_64
+          if-no-files-found: error
+          path: |
+            dist/windows-x64-release/**
+            dist/RustDeskTiny-install.exe
+
+  linux:
+    name: Linux x86_64
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Export GitHub Actions cache environment variables
+        uses: actions/github-script@d7906e4ad0b1822421a7e6a35d5ca353c962f410 # v6
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+      - name: Checkout source code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential clang cmake curl g++ gcc git \
+            libayatana-appindicator3-dev libasound2-dev libclang-dev \
+            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libgtk-3-dev \
+            libpulse-dev libssl-dev libunwind-dev libva-dev libvdpau-dev \
+            libxcb-randr0-dev libxcb-shape0-dev libxcb-xfixes0-dev \
+            libxdo-dev libxfixes-dev llvm-dev nasm ninja-build pkg-config \
+            python3 rpm unzip wget xz-utils
+          sudo apt-get remove -y libopus-dev || true
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@2783a3f08e1baf891508463f8c6653c258246225 # v2.12.0
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+
+      - name: Patch Flutter
+        shell: bash
+        run: |
+          flutter_root=$(dirname "$(dirname "$(which flutter)")")
+          git -C "$flutter_root" apply "$GITHUB_WORKSPACE/.github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff"
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          prefix-key: linux-x86_64-tiny
+
+      - name: Install Flutter Rust bridge code generator
+        run: cargo install flutter_rust_bridge_codegen --version "$FLUTTER_RUST_BRIDGE_VERSION" --features uuid --locked
+
+      - name: Setup vcpkg with GitHub Actions binary cache
+        uses: lukka/run-vcpkg@b1a0dd252f06b9e25b3c022a9a03bd7a427fb6a2 # v11
+        with:
+          vcpkgDirectory: /opt/artifacts/vcpkg
+          vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
+          doNotCache: false
+
+      - name: Install vcpkg dependencies
+        shell: bash
+        run: |
+          "$VCPKG_ROOT/vcpkg" install --triplet x64-linux --x-install-root="$VCPKG_ROOT/installed"
+
+      - name: Build RustDeskTiny
+        run: ./scripts/build-linux-tiny.sh
+
+      - name: Upload Linux artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: RustDeskTiny-linux-x86_64
+          if-no-files-found: error
+          path: dist/RustDeskTiny-*.deb
+
+  macos:
+    name: macOS ${{ matrix.arch }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            os: macos-15-intel
+            target: x86_64-apple-darwin
+            vcpkg-triplet: x64-osx
+          - arch: aarch64
+            os: macos-14
+            target: aarch64-apple-darwin
+            vcpkg-triplet: arm64-osx
+    steps:
+      - name: Export GitHub Actions cache environment variables
+        uses: actions/github-script@d7906e4ad0b1822421a7e6a35d5ca353c962f410 # v6
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+      - name: Checkout source code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          submodules: recursive
+
+      - name: Install build runtime
+        run: |
+          brew install llvm
+          command -v pkg-config >/dev/null || brew install pkg-config
+
+      - name: Install NASM
+        run: |
+          wget https://www.nasm.us/pub/nasm/releasebuilds/2.16.03/macosx/nasm-2.16.03-macosx.zip
+          unzip nasm-2.16.03-macosx.zip
+          sudo cp nasm-2.16.03/nasm /usr/local/bin/nasm
+          nasm --version
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+
+      - name: Patch Flutter
+        run: |
+          flutter_root=$(dirname "$(dirname "$(which flutter)")")
+          git -C "$flutter_root" apply "$GITHUB_WORKSPACE/.github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff"
+          sed -i -e 's/_setFramesEnabledState(false);/\/\/_setFramesEnabledState(false);/g' "$flutter_root/packages/flutter/lib/src/scheduler/binding.dart"
+
+      - name: Set minimum macOS version
+        if: matrix.arch == 'aarch64'
+        run: |
+          sed -i -e 's/MACOSX_DEPLOYMENT_TARGET=[0-9]*.[0-9]*/MACOSX_DEPLOYMENT_TARGET=12.3/' build.py
+          sed -i -e "s/platform :osx, '.*'/platform :osx, '12.3'/" flutter/macos/Podfile
+          sed -i -e 's/osx_minimum_system_version = "[0-9]*.[0-9]*"/osx_minimum_system_version = "12.3"/' Cargo.toml
+          sed -i -e 's/MACOSX_DEPLOYMENT_TARGET = [0-9]*.[0-9]*;/MACOSX_DEPLOYMENT_TARGET = 12.3;/' flutter/macos/Runner.xcodeproj/project.pbxproj
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
+        with:
+          toolchain: ${{ env.MAC_RUST_VERSION }}
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          prefix-key: macos-${{ matrix.arch }}-tiny
+
+      - name: Install Flutter Rust bridge code generator
+        run: cargo install flutter_rust_bridge_codegen --version "$FLUTTER_RUST_BRIDGE_VERSION" --features uuid --locked
+
+      - name: Setup vcpkg with GitHub Actions binary cache
+        uses: lukka/run-vcpkg@b1a0dd252f06b9e25b3c022a9a03bd7a427fb6a2 # v11
+        with:
+          vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
+          doNotCache: false
+
+      - name: Install vcpkg dependencies
+        env:
+          VCPKG_DEFAULT_TRIPLET: ${{ matrix.vcpkg-triplet }}
+        run: |
+          "$VCPKG_ROOT/vcpkg" install --triplet "${{ matrix.vcpkg-triplet }}" --x-install-root="$VCPKG_ROOT/installed"
+
+      - name: Build RustDeskTiny
+        env:
+          VCPKG_DEFAULT_TRIPLET: ${{ matrix.vcpkg-triplet }}
+        run: ./scripts/build-macos-tiny.sh
+
+      - name: Archive macOS application
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent \
+            "dist/macos-$(uname -m)-release/RustDeskTiny.app" \
+            "dist/RustDeskTiny-macos-${{ matrix.arch }}.zip"
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: RustDeskTiny-macos-${{ matrix.arch }}
+          if-no-files-found: error
+          path: dist/RustDeskTiny-macos-${{ matrix.arch }}.zip
