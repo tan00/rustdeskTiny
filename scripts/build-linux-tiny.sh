@@ -14,6 +14,10 @@ done
 
 cd "$root"
 rm -f rustdesk-*.deb
+(cd flutter && flutter pub get)
+flutter_rust_bridge_codegen \
+  --rust-input ./src/flutter_ffi.rs \
+  --dart-output ./flutter/lib/generated_bridge.dart
 python3 ./build.py --flutter --rustdesk-tiny
 
 shopt -s nullglob
