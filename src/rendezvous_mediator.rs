@@ -1140,45 +1140,60 @@ impl RendezvousMediator {
 
 #[cfg(feature = "rustdesk-tiny")]
 async fn direct_server_tiny(server: ServerPtr) {
-    let port = get_direct_port();
-    let address = SocketAddr::from(([0, 0, 0, 0], port as u16));
-    let listener = match hbb_common::tcp::new_listener(address, false).await {
-        Ok(listener) => listener,
-        Err(error) => {
-            log::error!("Failed to listen on {address}: {error}");
-            return;
-        }
-    };
-    log::info!("RustDeskTiny direct server listening on {address}");
     loop {
-        match listener.accept().await {
-            Ok((stream, peer)) => {
-                if let Err(error) = stream.set_nodelay(true) {
-                    log::warn!("Failed to set TCP_NODELAY for {peer}: {error}");
-                }
-                let local = match stream.local_addr() {
-                    Ok(local) => local,
-                    Err(error) => {
-                        log::error!("Failed to resolve accepted socket address: {error}");
-                        continue;
+        let port = get_direct_port();
+        let address = SocketAddr::from(([0, 0, 0, 0], port as u16));
+        match hbb_common::tcp::new_listener(address, false).await {
+            Ok(listener) => {
+                log::info!("RustDeskTiny direct server listening on {address}");
+                loop {
+                    if get_direct_port() != port {
+                        log::info!(
+                            "Direct-access port changed, rebuilding listener (was {port})"
+                        );
+                        break;
                     }
-                };
-                let server = server.clone();
-                tokio::spawn(async move {
-                    allow_err!(
-                        crate::server::create_tcp_connection(
-                            server,
-                            hbb_common::Stream::from(stream, local),
-                            peer,
-                            false,
-                            ConnectionMeta::default(),
-                        )
-                        .await
-                    );
-                });
+                    match hbb_common::timeout(1000, listener.accept()).await {
+                        Ok(Ok((stream, peer))) => {
+                            if let Err(error) = stream.set_nodelay(true) {
+                                log::warn!("Failed to set TCP_NODELAY for {peer}: {error}");
+                            }
+                            let local = match stream.local_addr() {
+                                Ok(local) => local,
+                                Err(error) => {
+                                    log::error!(
+                                        "Failed to resolve accepted socket address: {error}"
+                                    );
+                                    continue;
+                                }
+                            };
+                            let server = server.clone();
+                            tokio::spawn(async move {
+                                allow_err!(
+                                    crate::server::create_tcp_connection(
+                                        server,
+                                        hbb_common::Stream::from(stream, local),
+                                        peer,
+                                        false,
+                                        ConnectionMeta::default(),
+                                    )
+                                    .await
+                                );
+                            });
+                        }
+                        Ok(Err(error)) => {
+                            log::error!("Direct listener accept failed: {error}");
+                            break;
+                        }
+                        Err(_) => {}
+                    }
+                }
             }
-            Err(error) => log::error!("Direct listener accept failed: {error}"),
+            Err(error) => {
+                log::error!("Failed to listen on {address}: {error}");
+            }
         }
+        sleep(1.).await;
     }
 }
 
