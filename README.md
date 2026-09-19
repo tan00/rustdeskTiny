@@ -8,9 +8,22 @@
   <b>We need your help to translate this README, <a href="https://github.com/rustdesk/rustdesk/tree/master/src/lang">RustDesk UI</a> and <a href="https://github.com/rustdesk/doc.rustdesk.com">RustDesk Doc</a> to your native language</b>
 </p>
 
+## 本项目（RustDeskTiny）与原版 RustDesk 的差异
+
+本仓库是 RustDesk 的定制分支（产品分支 `rustdesk-tiny`，上游基线 `978e2e28b`），仅保留 **IP:端口直连** 的远程桌面能力。与原版的主要差异：
+
+- **仅支持直连**：只接受显式的数字 IPv4/IPv6 地址加非零端口；不使用 RustDesk ID、不注册会合/中继服务器，无 NAT 探测、延迟探测、账号同步和软件自动更新。
+- **直连监听端口改为 21201**（`RENDEZVOUS_PORT = 21119`，直连端口 = `RENDEZVOUS_PORT + 2`），避免与原版 RustDesk 占用的 21116–21119 冲突，两者可共存。可在设置中自定义直连端口。
+- **稳定的一次性密码**：仅通过显式刷新或修改密码长度才会变化，会话结束/认证失败不再自动轮换。
+- **界面精简**：隐藏本机 ID 与网络状态，移除地址发现、自动补全、账号/服务器类设置。
+- **独立产品身份**：独立的 `rustdesk-tiny` Cargo feature、安装包与服务生命周期（含静默安装/升级），采集、输入、会话等核心实现仍与上游共享。
+
+完整的逐文件改动清单与维护规则见 [UPSTREAM.md](UPSTREAM.md)。
+
 > [!Caution]
 > **Misuse Disclaimer:** <br>
 > The developers of RustDesk do not condone or support any unethical or illegal use of this software. Misuse, such as unauthorized access, control or invasion of privacy, is strictly against our guidelines. The authors are not responsible for any misuse of the application.
+
 
 
 Chat with us: [Discord](https://discord.gg/nDceKgxnkV) | [Twitter](https://twitter.com/rustdesk) | [Reddit](https://www.reddit.com/r/rustdesk) | [YouTube](https://www.youtube.com/@rustdesk)
