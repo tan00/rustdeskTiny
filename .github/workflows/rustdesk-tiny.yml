@@ -112,6 +112,10 @@ jobs:
         run: |
           "$VCPKG_ROOT/vcpkg" install --triplet x64-windows-static --x-install-root="$VCPKG_ROOT/installed"
 
+      - name: Resolve Flutter dependencies
+        working-directory: flutter
+        run: flutter pub get
+
       - name: Build RustDeskTiny
         shell: pwsh
         run: ./scripts/build-windows-tiny.ps1

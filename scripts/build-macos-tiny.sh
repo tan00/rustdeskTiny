@@ -12,28 +12,23 @@ case "$output" in
   *) echo "output must be inside $root/dist" >&2; exit 2 ;;
 esac
 
-for command in cargo flutter flutter_rust_bridge_codegen python3 xcodebuild xcrun; do
+for command in brew cargo flutter flutter_rust_bridge_codegen python3 xcodebuild; do
   command -v "$command" >/dev/null || { echo "Missing required command: $command" >&2; exit 1; }
 done
 xcodebuild -version >/dev/null
 
 cd "$root"
 (cd flutter && flutter pub get)
-llvm_path=${RUSTDESK_LLVM_PATH:-}
-if [[ -z "$llvm_path" ]]; then
-  clang_path=$(xcrun --find clang)
-  llvm_path=$(cd "$(dirname "$clang_path")/.." && pwd)
-fi
+llvm_path=${RUSTDESK_LLVM_PATH:-$(brew --prefix llvm)}
 [[ -f "$llvm_path/lib/libclang.dylib" ]] || {
   echo "libclang.dylib not found under $llvm_path; set RUSTDESK_LLVM_PATH" >&2
   exit 1
 }
-macos_sdk=$(xcrun --sdk macosx --show-sdk-path)
 flutter_rust_bridge_codegen \
   --rust-input ./src/flutter_ffi.rs \
   --dart-output ./flutter/lib/generated_bridge.dart \
   --llvm-path "$llvm_path" \
-  --llvm-compiler-opts="-isysroot $macos_sdk"
+  --c-output ./flutter/macos/Runner/bridge_generated.h
 python3 ./build.py --flutter --rustdesk-tiny
 
 source_app="$root/flutter/build/macos/Build/Products/Release/RustDesk.app"
