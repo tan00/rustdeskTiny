@@ -46,7 +46,7 @@ multi-connection help, and hides account/network/server/proxy settings.
 | Tiny home page: no local ID/network status, but one-time password remains visible | `flutter/lib/common.dart`, `flutter/lib/desktop/pages/desktop_home_page.dart`, `flutter/lib/models/server_model.dart`, `src/lang/cn.rs`, `src/lang/en.rs` |
 | Removes ID discovery, remote lookup, autocomplete, account and server-oriented UI | `flutter/lib/desktop/pages/connection_page.dart`, `flutter/lib/common/widgets/connection_page_title.dart`, `flutter/lib/desktop/pages/desktop_setting_page.dart`, `flutter/lib/models/peer_tab_model.dart` |
 | Standalone install/service lifecycle and silent install/update | `src/tiny.rs`, `src/core_main.rs`, `src/platform/windows.rs`, `libs/portable/src/main.rs`, `scripts/build-windows-tiny.ps1` |
-| Independent Linux and macOS packaging | `scripts/build-linux-tiny.sh`, `scripts/build-macos-tiny.sh` |
+| Linux and macOS packaging through the upstream build pipeline | `build.py`, `scripts/build-linux-tiny.sh`, `scripts/build-macos-tiny.sh` |
 
 ## Rust source files changed from upstream
 
@@ -95,8 +95,8 @@ uncommitted Tiny-only changes. Direct-target enforcement belongs in
 | --- | --- |
 | `build.py` | Adds `--rustdesk-tiny` and forwards the Cargo feature. |
 | `scripts/build-windows-tiny.ps1` | Produces a renamed Windows application directory and standalone `RustDeskTiny-install.exe`; verifies toolchain inputs and installs the Python Brotli dependency only when absent. |
-| `scripts/build-linux-tiny.sh` | Independent Linux Tiny build entrypoint. |
-| `scripts/build-macos-tiny.sh` | Independent macOS Tiny build entrypoint. |
+| `scripts/build-linux-tiny.sh` | Thin Linux Tiny entrypoint over upstream `build.py`; verifies and renames the generated Debian package. |
+| `scripts/build-macos-tiny.sh` | Thin native-architecture macOS Tiny entrypoint over upstream `build.py`; verifies the app and embedded service, then applies Tiny bundle identity. |
 
 `flutter/pubspec.lock` may change when Flutter resolves dependencies. Treat it
 as generated dependency state, not as Tiny product logic, and review it
