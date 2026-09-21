@@ -50,6 +50,16 @@ jobs:
             core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
             core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
 
+      - name: Bootstrap Debian 10 build container
+        run: |
+          printf '%s\n' \
+            'deb http://archive.debian.org/debian buster main' \
+            'deb http://archive.debian.org/debian-security buster/updates main' \
+            > /etc/apt/sources.list
+          printf 'Acquire::Check-Valid-Until "false";\n' > /etc/apt/apt.conf.d/99archive
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates git
+
       - name: Checkout source code
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
@@ -134,6 +144,8 @@ jobs:
   linux:
     name: Linux x86_64
     runs-on: ubuntu-22.04
+    container:
+      image: debian:10-slim
     steps:
       - name: Export GitHub Actions cache environment variables
         uses: actions/github-script@d7906e4ad0b1822421a7e6a35d5ca353c962f410 # v6
@@ -149,16 +161,15 @@ jobs:
 
       - name: Install build dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            build-essential clang cmake curl g++ gcc git \
-            libayatana-appindicator3-dev libasound2-dev libclang-dev \
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            binutils build-essential clang cmake curl file g++ gcc \
+            libappindicator3-dev libasound2-dev libclang-dev libglu1-mesa \
             libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libgtk-3-dev \
             libpulse-dev libssl-dev libunwind-dev libva-dev libvdpau-dev \
             libxcb-randr0-dev libxcb-shape0-dev libxcb-xfixes0-dev \
             libxdo-dev libxfixes-dev llvm-dev nasm ninja-build pkg-config \
-            python3 rpm unzip wget xz-utils
-          sudo apt-get remove -y libopus-dev || true
+            python3 rpm unzip wget xz-utils zip
+          apt-get remove -y libopus-dev || true
 
       - name: Install Flutter
         uses: subosito/flutter-action@2783a3f08e1baf891508463f8c6653c258246225 # v2.12.0
@@ -180,7 +191,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
-          prefix-key: linux-x86_64-tiny
+          prefix-key: linux-x86_64-glibc228-tiny
 
       - name: Install Flutter Rust bridge code generator
         run: cargo install flutter_rust_bridge_codegen --version "$FLUTTER_RUST_BRIDGE_VERSION" --features uuid --locked
@@ -199,6 +210,33 @@ jobs:
 
       - name: Build RustDeskTiny
         run: ./scripts/build-linux-tiny.sh
+
+      - name: Verify GLIBC 2.28 compatibility
+        shell: bash
+        run: |
+          set -euo pipefail
+          package=$(find dist -maxdepth 1 -type f -name 'RustDeskTiny-*.deb' -print -quit)
+          test -n "$package"
+          root=$(mktemp -d)
+          trap 'rm -rf "$root"' EXIT
+          dpkg-deb -x "$package" "$root"
+          failed=0
+          while IFS= read -r -d '' candidate; do
+            if ! file "$candidate" | grep -q 'ELF'; then
+              continue
+            fi
+            required=$(readelf --version-info "$candidate" 2>/dev/null \
+              | grep -oE 'GLIBC_[0-9]+(\.[0-9]+)+' \
+              | sort -Vu \
+              | tail -1 || true)
+            test -n "$required" || continue
+            echo "$required ${candidate#"$root"}"
+            if [ "$(printf '%s\n' GLIBC_2.28 "$required" | sort -V | tail -1)" != GLIBC_2.28 ]; then
+              echo "ERROR: ${candidate#"$root"} requires $required (maximum allowed: GLIBC_2.28)" >&2
+              failed=1
+            fi
+          done < <(find "$root" -type f -print0)
+          test "$failed" -eq 0
 
       - name: Upload Linux artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
