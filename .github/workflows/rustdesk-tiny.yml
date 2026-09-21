@@ -162,7 +162,7 @@ jobs:
       - name: Install build dependencies
         run: |
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            binutils build-essential clang cmake curl file g++ gcc \
+            binutils build-essential clang cmake curl file g++ gcc jq \
             libappindicator3-dev libasound2-dev libclang-dev libglu1-mesa \
             libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libgtk-3-dev \
             libpulse-dev libssl-dev libunwind-dev libva-dev libvdpau-dev \
