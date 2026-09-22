@@ -177,6 +177,13 @@ jobs:
           channel: stable
           flutter-version: ${{ env.FLUTTER_VERSION }}
 
+      - name: Trust Flutter SDK repository
+        shell: bash
+        run: |
+          flutter_root=$(dirname "$(dirname "$(command -v flutter)")")
+          git config --global --add safe.directory "$flutter_root"
+          flutter --version
+
       - name: Patch Flutter
         shell: bash
         run: |
