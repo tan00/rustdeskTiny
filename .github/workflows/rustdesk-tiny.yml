@@ -162,14 +162,17 @@ jobs:
       - name: Install build dependencies
         run: |
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            autoconf automake binutils build-essential clang cmake curl file g++ gcc jq libtool \
-            libappindicator3-dev libasound2-dev libclang-dev libglu1-mesa \
+            autoconf automake binutils build-essential clang clang-11 cmake curl file g++ gcc jq libtool \
+            libappindicator3-dev libasound2-dev libclang-dev libclang-11-dev libglu1-mesa \
             libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libgtk-3-dev \
             libpulse-dev libssl-dev libunwind-dev libva-dev libvdpau-dev \
             libxcb-randr0-dev libxcb-shape0-dev libxcb-xfixes0-dev \
             libxdo-dev libxfixes-dev llvm-dev nasm ninja-build pkg-config \
             python3 rpm unzip wget xz-utils zip
           apt-get remove -y libopus-dev || true
+          export LIBCLANG_PATH=/usr/lib/llvm-11/lib
+          echo "LIBCLANG_PATH=$LIBCLANG_PATH" >> "$GITHUB_ENV"
+          nm -D "$LIBCLANG_PATH/libclang.so" | grep -q clang_Cursor_isAnonymousRecordDecl
 
       - name: Install Flutter
         uses: subosito/flutter-action@2783a3f08e1baf891508463f8c6653c258246225 # v2.12.0
