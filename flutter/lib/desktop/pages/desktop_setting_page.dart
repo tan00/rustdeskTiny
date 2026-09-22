@@ -1399,7 +1399,7 @@ class _SafetyState extends State<_Safety> with AutomaticKeepAliveClientMixin {
                           r'^([0-9]|[1-9]\d|[1-9]\d{2}|[1-9]\d{3}|[1-5]\d{4}|6[0-4]\d{3}|65[0-4]\d{2}|655[0-2]\d|6553[0-5])$')),
                     ],
                     decoration: const InputDecoration(
-                      hintText: '21201',
+                      hintText: '21121',
                       contentPadding:
                           EdgeInsets.symmetric(vertical: 12, horizontal: 12),
                     ),
