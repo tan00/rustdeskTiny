@@ -2,9 +2,9 @@
 Name=RustDeskTiny
 NoDisplay=true
 MimeType=x-scheme-handler/rustdesk;
-TryExec=rustdesk
-Exec=rustdesk %u
-Icon=rustdesk
+TryExec=rustdesktiny
+Exec=rustdesktiny %u
+Icon=rustdesktiny
 Terminal=false
 Type=Application
 StartupNotify=false
