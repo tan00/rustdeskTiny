@@ -25,6 +25,9 @@ struct MacUpdateLock {
 
 #[cfg(target_os = "macos")]
 fn acquire_mac_update_lock() -> ResultType<MacUpdateLock> {
+    #[cfg(feature = "rustdesk-tiny")]
+    let path = std::path::PathBuf::from("/var/run/rustdesktiny-update.lock");
+    #[cfg(not(feature = "rustdesk-tiny"))]
     let path = std::path::PathBuf::from("/var/run/rustdesk-update.lock");
     let handle = std::fs::OpenOptions::new()
         .read(true)

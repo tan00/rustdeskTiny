@@ -14,7 +14,7 @@ case $1 in
 				rm /etc/systemd/system/rustdesktiny.service /usr/lib/systemd/system/rustdesktiny.service || true
 			
 			# workaround temp dev build between 1.1.9 and 1.2.0
-			serverUser=$(ps -ef | grep -E 'rustdesk +--server' | grep -v 'sudo ' | awk '{print $1}' | head -1)
+				serverUser=$(ps -ef | grep -E 'rustdesktiny +--server' | grep -v 'sudo ' | awk '{print $1}' | head -1)
 			if [ "$serverUser" != "" ] && [ "$serverUser" != "root" ]
 			then
 					systemctl --machine=${serverUser}@.host --user stop rustdesktiny >/dev/null 2>&1 || true
