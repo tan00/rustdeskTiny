@@ -45,7 +45,11 @@ static mut LATEST_SEED: i32 = 0;
 #[inline]
 fn get_update_temp_dir() -> PathBuf {
     let euid = unsafe { hbb_common::libc::geteuid() };
-    Path::new("/tmp").join(format!(".rustdeskupdate-{}", euid))
+    #[cfg(feature = "rustdesk-tiny")]
+    let prefix = ".rustdesktinyupdate";
+    #[cfg(not(feature = "rustdesk-tiny"))]
+    let prefix = ".rustdeskupdate";
+    Path::new("/tmp").join(format!("{}-{}", prefix, euid))
 }
 
 #[inline]
@@ -304,11 +308,22 @@ fn update_daemon_agent(agent_plist_file: String, update_source_dir: String, sync
 
 fn correct_app_name(s: &str) -> String {
     let mut s = s.to_owned();
-    if let Some(bundleid) = get_bundle_id() {
-        s = s.replace("com.carriez.rustdesk", &bundleid);
+    // The service executable may not have an NSBundle identifier of its own.
+    // Use the packaged identifier for Tiny when generating launchd plists.
+    #[cfg(feature = "rustdesk-tiny")]
+    let bundleid = Some("top.p2premote.rustdesktiny".to_owned());
+    #[cfg(not(feature = "rustdesk-tiny"))]
+    let bundleid = get_bundle_id();
+
+    const BUNDLE_ID_PLACEHOLDER: &str = "__RUSTDESK_BUNDLE_IDENTIFIER__";
+    if bundleid.is_some() {
+        s = s.replace("com.carriez.rustdesk", BUNDLE_ID_PLACEHOLDER);
     }
     s = s.replace("rustdesk", &crate::get_app_name().to_lowercase());
     s = s.replace("RustDesk", &crate::get_app_name());
+    if let Some(bundleid) = bundleid {
+        s = s.replace(BUNDLE_ID_PLACEHOLDER, &bundleid);
+    }
     s
 }
 
@@ -1090,8 +1105,12 @@ pub fn update_from_dmg_as_root(dmg_path: &str, expected_version: &str) -> Result
         bail!("[root-update] unsafe application name");
     }
     let app_bundle = format!("/Applications/{}.app", app_name);
+    #[cfg(feature = "rustdesk-tiny")]
+    let root_update_template = "/tmp/.rustdesktinyupdate-root-XXXXXX";
+    #[cfg(not(feature = "rustdesk-tiny"))]
+    let root_update_template = "/tmp/.rustdeskupdate-root-XXXXXX";
     let tmp_dir_output = std::process::Command::new("/usr/bin/mktemp")
-        .args(&["-d", "/tmp/.rustdeskupdate-root-XXXXXX"])
+        .args(&["-d", root_update_template])
         .output()?;
     let tmp_dir = String::from_utf8(tmp_dir_output.stdout)
         .map_err(|e| anyhow!("[root-update] mktemp output error: {}", e))?
@@ -1238,6 +1257,10 @@ pub fn update_from_dmg_as_root(dmg_path: &str, expected_version: &str) -> Result
     // so we spawn a script that waits, kills processes, copies, and restarts.
     let daemon_label = format!("com.carriez.{}_service", app_name);
     let agent_label = format!("com.carriez.{}_server", app_name);
+    #[cfg(feature = "rustdesk-tiny")]
+    let failure_marker = "/var/root/.rustdesktinyupdate_failed";
+    #[cfg(not(feature = "rustdesk-tiny"))]
+    let failure_marker = "/var/root/.rustdeskupdate_failed";
     let script_path = format!("{}/rustdesk_update.sh", tmp_dir);
     let script = format!(
         r#"#!/bin/sh
@@ -1569,7 +1592,7 @@ rollback_transaction() {{
     restore_old_bundle || restore_failed=1
     cp "{daemon_plist_bak}" "{daemon_plist}" || restore_failed=1
     cp "{agent_plist_bak}" "{agent_plist}" || restore_failed=1
-    touch /var/root/.rustdeskupdate_failed || restore_failed=1
+    touch {failure_marker} || restore_failed=1
     if ! launchctl load -w "{daemon_plist}" 2>/dev/null && \
        ! launchctl bootstrap system "{daemon_plist}" 2>/dev/null; then
         restore_failed=1
@@ -1724,6 +1747,7 @@ rm -rf {tmp_dir}
         agent_label = agent_label,
         daemon_plist_bak = daemon_plist_bak,
         agent_plist_bak = agent_plist_bak,
+        failure_marker = failure_marker,
     );
 
     {
@@ -1811,8 +1835,12 @@ fn extract_dmg_into_existing_dir(dmg_path: &str, target_dir: &str) -> ResultType
 }
 
 fn extract_dmg_inner(dmg_path: &str, target_dir: &str) -> ResultType<()> {
+    #[cfg(feature = "rustdesk-tiny")]
+    let mount_template = "/tmp/.rustdesktinymount-XXXXXX";
+    #[cfg(not(feature = "rustdesk-tiny"))]
+    let mount_template = "/tmp/.rustdeskmount-XXXXXX";
     let mount_output = Command::new("/usr/bin/mktemp")
-        .args(["-d", "/tmp/.rustdeskmount-XXXXXX"])
+        .args(["-d", mount_template])
         .output()?;
     if !mount_output.status.success() {
         bail!("Failed to create a private DMG mount directory");

@@ -54,6 +54,8 @@ info_plist="$app/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c 'Set :CFBundleName RustDeskTiny' "$info_plist"
 /usr/libexec/PlistBuddy -c 'Set :CFBundleDisplayName RustDeskTiny' "$info_plist" 2>/dev/null || \
   /usr/libexec/PlistBuddy -c 'Add :CFBundleDisplayName string RustDeskTiny' "$info_plist"
+/usr/libexec/PlistBuddy -c 'Set :CFBundleURLTypes:0:CFBundleURLName top.p2premote.rustdesktiny' "$info_plist"
+/usr/libexec/PlistBuddy -c 'Set :CFBundleURLTypes:0:CFBundleURLSchemes:0 rustdesktiny' "$info_plist"
 
 cp LICENCE "$output/"
 printf 'RustDeskTiny app: %s\n' "$app"

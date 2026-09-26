@@ -459,6 +459,9 @@ pub fn has_no_active_conns_ipc() -> bool {
 
 #[cfg(target_os = "macos")]
 fn wait_for_failed_update_retry() {
+    #[cfg(feature = "rustdesk-tiny")]
+    const FAILURE_MARKER: &str = "/var/root/.rustdesktinyupdate_failed";
+    #[cfg(not(feature = "rustdesk-tiny"))]
     const FAILURE_MARKER: &str = "/var/root/.rustdeskupdate_failed";
     let marker = std::path::Path::new(FAILURE_MARKER);
     if !marker.exists() {
@@ -555,9 +558,13 @@ pub fn check_update_as_root() -> ResultType<bool> {
         for entry in entries.flatten() {
             let name = entry.file_name();
             let name_str = name.to_string_lossy();
-            if name_str.starts_with(".rustdeskupdate-root-")
-                || name_str.starts_with(".rustdeskdownload-")
-            {
+            #[cfg(feature = "rustdesk-tiny")]
+            let is_update_temp = name_str.starts_with(".rustdesktinyupdate-root-")
+                || name_str.starts_with(".rustdesktinydownload-");
+            #[cfg(not(feature = "rustdesk-tiny"))]
+            let is_update_temp = name_str.starts_with(".rustdeskupdate-root-")
+                || name_str.starts_with(".rustdeskdownload-");
+            if is_update_temp {
                 let path = entry.path();
                 let Ok(metadata) = std::fs::symlink_metadata(&path) else {
                     continue;
@@ -602,8 +609,12 @@ pub fn check_update_as_root() -> ResultType<bool> {
     let client = create_http_client_with_url_strict(&dmg_url)?;
     // Use mktemp so a local user cannot pre-create a predictable path and
     // permanently deny updates for a reused service PID.
+    #[cfg(feature = "rustdesk-tiny")]
+    let download_template = "/tmp/.rustdesktinydownload-XXXXXX";
+    #[cfg(not(feature = "rustdesk-tiny"))]
+    let download_template = "/tmp/.rustdeskdownload-XXXXXX";
     let private_tmp_output = std::process::Command::new("/usr/bin/mktemp")
-        .args(["-d", "/tmp/.rustdeskdownload-XXXXXX"])
+        .args(["-d", download_template])
         .output()?;
     if !private_tmp_output.status.success() {
         bail!(
